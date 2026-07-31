@@ -1,0 +1,12 @@
+{
+  "name": "@adaptive-ai/sdk-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Game SDK — runs inside the plugin iframe (emit, getLegalActions, submitDecision)",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run --root ."
+  }
+}

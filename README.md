@@ -1,130 +1,103 @@
-# Adaptive AI Games Platform
+# Adaptive AI Gaming Platform
 
-A full-stack web application featuring two adaptive AI games that learn from player behavior. Built with React, Express, and MongoDB.
+A platform where AI opponents genuinely learn each player's behavior over time — through observation only, never through hidden stat advantages. The Adaptive AI Engine is the product; games are the medium it runs on.
+
+**Design documents (read in this order):**
+1. [`PLATFORM_REDESIGN_PROPOSAL.md`](./PLATFORM_REDESIGN_PROPOSAL.md) — open-source game research and licensing analysis
+2. [`PLATFORM_V2_DESIGN.md`](./PLATFORM_V2_DESIGN.md) — platform architecture, Plugin SDK, database/API/deployment/security design
+3. [`ADAPTIVE_AI_ENGINE_WHITEPAPER.md`](./ADAPTIVE_AI_ENGINE_WHITEPAPER.md) — the AI Engine's technical design, grounded against Alien: Isolation, Left 4 Dead, the Nemesis System, Forza Drivatar, GOAP, and Utility AI
+
+`archive/` holds WARDEN and THE FIVE — the original proof-of-concept games that proved genuinely adaptive AI opponents are possible in the browser. Frozen, not on the active roadmap. See `archive/README.md`.
 
 ## Project Structure
 
 ```
 /
-├── frontend/          # React + Vite + TypeScript
-│   ├── src/
-│   │   ├── pages/     # Game pages and landing page
-│   │   ├── components/# Shared components
-│   │   ├── services/  # API calls and session management
-│   │   ├── hooks/     # Custom React hooks
-│   │   ├── styles/    # CSS files
-│   │   └── App.tsx    # Main app with routing
-│   └── package.json
-├── backend/           # Express + Node.js
-│   ├── db/            # Database connection
-│   ├── models/        # Mongoose schemas
-│   ├── routes/        # API endpoints
-│   ├── server.ts      # Express server setup
-│   └── package.json
-└── README.md
+├── platform/
+│   ├── api/                      # Express/Node — auth, plugin registry, dashboard API
+│   ├── web/                      # React — Player Dashboard (launcher, profile, match history)
+│   ├── sdk/
+│   │   ├── client/                # runs inside a plugin's sandboxed iframe
+│   │   └── host/                  # runs in the parent frame, enforces the fairness boundary
+│   ├── event-pipeline/            # canonical event ingestion, batching, validation, persistence
+│   ├── player-intelligence/       # cross-game player profile aggregation
+│   └── ai-engine/                 # the Adaptive AI Engine — 10 modules, see below
+│       ├── behavior-analysis/
+│       ├── memory-engine/
+│       ├── player-modeling/
+│       ├── pattern-recognition/
+│       ├── strategy-planner/
+│       ├── decision-engine/
+│       ├── difficulty-calibration/
+│       ├── opponent-personality/
+│       ├── long-term-memory/
+│       └── explainability/
+├── plugins/                       # one directory per game plugin (empty until Phase 10)
+├── archive/                       # WARDEN, THE FIVE — frozen proof-of-concept
+└── *.md                           # design documents (see above)
 ```
+
+Each module under `platform/` is an independent npm workspace with its own `package.json`, `tsconfig.json` (extending the root `tsconfig.base.json`), and `README.md` describing its responsibility and boundary — see the individual READMEs for what each module does and does not own.
 
 ## Tech Stack
 
-- **Frontend**: React 18, TypeScript, Vite, React Router
-- **Backend**: Express.js, Node.js, TypeScript
-- **Database**: MongoDB Atlas (free M0 cluster)
-- **Hosting**: Vercel (frontend) + Railway (backend)
-
-## Games Included
-
-### WARDEN
-Real-time dodging game where the boss learns your dodge patterns. Memory tracks dodge directions, timing, and recovery strategies.
-
-### THE FIVE
-Squad-based 5v1 battles where your team learns the boss's attack patterns and adapts their tactics accordingly.
+- **Platform Dashboard**: React 19, TypeScript, Vite, React Router
+- **Platform API**: Express.js, Node.js, TypeScript
+- **Database**: MongoDB Atlas
+- **Auth**: JWT (email/password via bcrypt) + Google OAuth
+- **Monorepo tooling**: npm workspaces, shared strict TypeScript config, Vitest
 
 ## Local Development Setup
 
 ### Prerequisites
-
 - Node.js 18+
-- MongoDB Atlas account (free tier available)
+- MongoDB Atlas account
 - Git
 
-### Step 1: MongoDB Atlas Setup
-
-1. Go to https://www.mongodb.com/cloud/atlas
-2. Sign up for a free account
-3. Create a new M0 cluster
-4. Create a database user (save credentials)
-5. Add your IP to IP Access List
-6. Get your connection string from "Connect" → "Drivers"
-
-### Step 2: Backend Setup
-
+### Install everything (monorepo root)
 ```bash
-cd backend
-
-# Copy env template and add your MongoDB connection string
-cp .env.example .env
-
-# Edit .env and add:
-# MONGODB_URI=mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/adaptive-games?retryWrites=true&w=majority
-# MONGODB_DB_NAME=adaptive-games
-# NODE_ENV=development
-# PORT=5000
-# CORS_ORIGIN=http://localhost:5173
-
-# Install dependencies
 npm install
-
-# Start dev server
-npm run dev
 ```
 
-Backend runs on `http://localhost:5000`
-
-### Step 3: Frontend Setup
-
+### Platform API
 ```bash
-cd frontend
-
-# Copy env template
+cd platform/api
 cp .env.example .env
-
-# Install dependencies
-npm install
-
-# Start dev server
+# fill in MONGODB_URI, JWT_SECRET, GOOGLE_CLIENT_ID, etc.
 npm run dev
 ```
+Runs on `http://localhost:5000`.
 
-Frontend runs on `http://localhost:5173`
+### Player Dashboard
+```bash
+cd platform/web
+cp .env.example .env
+npm run dev
+```
+Runs on `http://localhost:5173`.
 
-### Step 4: Test the Application
+### Test the current state
+1. Navigate to `http://localhost:5173` → redirected to `/login` → sign up or use Google Sign-In.
+2. The archived WARDEN/THE FIVE games remain playable from the dashboard as of this writing (see `archive/README.md` for status).
+3. The Adaptive AI Engine modules under `platform/ai-engine/` are architecture scaffolds as of Phase 1 — no plugin runs against them yet. See each module's `README.md` for its implementation phase.
 
-1. Navigate to `http://localhost:5173`
-2. You'll be redirected to `/login` — click "Sign up" to create an account (email/password), or use "Sign in with Google" if `VITE_GOOGLE_CLIENT_ID` is configured
-3. Click into WARDEN or THE FIVE to play
-4. Log out and log back in — your match history and stats on the landing page should persist
-
-## API Endpoints
+## API Endpoints (Platform API — `platform/api`)
 
 ### Authentication
-- `POST /api/auth/signup` - Create an account with email/password
-- `POST /api/auth/login` - Log in with email/password
-- `POST /api/auth/google` - Log in / sign up with a Google ID token
-- `GET /api/auth/me` - Fetch the current authenticated user (requires `Authorization: Bearer <token>`)
+- `POST /api/auth/signup`, `POST /api/auth/login`, `POST /api/auth/google`, `GET /api/auth/me`
 
 ### Memory Management
 All routes below require `Authorization: Bearer <token>` and operate on the authenticated user's own data.
-- `GET /api/memory/:gameType` - Load game memory
-- `POST /api/memory/:gameType` - Save game memory
-- `POST /api/match` - Log a completed match
-- `GET /api/stats/:gameType` - Get player statistics
+- `GET`/`POST /api/memory/:gameType`, `POST /api/match`, `GET /api/stats/:gameType`
 
 ### Health
-- `GET /api/health` - Server health check
+- `GET /api/health`
+
+*(The Event Pipeline's own ingestion API — `POST /api/events/batch` — is specified in `PLATFORM_V2_DESIGN.md` §7 and lands in Phase 3.)*
 
 ## Environment Variables
 
-### Backend (.env)
+### `platform/api/.env`
 ```
 MONGODB_URI=mongodb+srv://...
 MONGODB_DB_NAME=adaptive-games
@@ -135,138 +108,29 @@ JWT_SECRET=a-long-random-string
 GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
 ```
 
-### Frontend (.env)
+### `platform/web/.env`
 ```
 VITE_API_URL=http://localhost:5000/api
 VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
 ```
 
-Google Sign-In requires an OAuth 2.0 Client ID from [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (type "Web application", with your frontend URL added as an authorized JavaScript origin). Use the same client ID for both `GOOGLE_CLIENT_ID` (backend) and `VITE_GOOGLE_CLIENT_ID` (frontend).
+## Implementation Status
 
-## Database Schema
+Following the approved phased implementation order (see `ADAPTIVE_AI_ENGINE_WHITEPAPER.md` and the phase-gated roadmap it and `PLATFORM_V2_DESIGN.md` establish):
 
-### Players Collection
-Each document is a player's account. `passwordHash` is set for email/password accounts; `googleId` is set for Google accounts (an account may have either or both).
-```javascript
-{
-  _id: ObjectId,
-  email: string,
-  name: string,
-  passwordHash: string,   // optional
-  googleId: string,       // optional
-  createdAt: Date,
-  updatedAt: Date
-}
-```
+- [x] Phase 1 — Repository structure (architecture only, no business logic)
+- [ ] Phase 2 — Plugin SDK
+- [ ] Phase 3 — Event Pipeline
+- [ ] Phase 4 — Memory Engine (persistence only)
+- [ ] Phase 5 — Player Modeling
+- [ ] Phase 6 — Pattern Recognition
+- [ ] Phase 7 — Strategy Planner
+- [ ] Phase 8 — Decision Engine
+- [ ] Phase 9 — Explainability
+- [ ] Phase 10 — First real plugin integration (TOSIOS)
 
-### GameMemory Collection
-```javascript
-{
-  _id: ObjectId,
-  playerId: ObjectId,
-  gameType: "warden" | "five",
-  data: { /* game-specific memory */ },
-  updatedAt: Date,
-  createdAt: Date
-}
-```
-
-### GameSessions Collection
-```javascript
-{
-  _id: ObjectId,
-  playerId: ObjectId,
-  gameType: "warden" | "five",
-  matchNumber: number,
-  won: boolean,
-  duration: number,
-  timestamp: Date
-}
-```
-
-## Build & Deployment
-
-### Build Frontend
-```bash
-cd frontend
-npm run build
-# Output in dist/
-```
-
-### Build Backend
-```bash
-cd backend
-npm run build
-# Output in dist/
-```
-
-### Deploy to Vercel (Frontend)
-1. Push to GitHub
-2. Connect repo to Vercel
-3. Set `VITE_API_URL` environment variable
-4. Deploy
-
-### Deploy to Railway (Backend)
-1. Push to GitHub
-2. Connect repo to Railway
-3. Set environment variables:
-   - `MONGODB_URI`
-   - `MONGODB_DB_NAME`
-   - `NODE_ENV=production`
-   - `PORT=5000`
-4. Deploy
-
-## Development Workflow
-
-### Adding a New Feature
-1. Create a new branch
-2. Make changes to frontend or backend
-3. Test locally
-4. Commit and push
-5. Deploy (frontend to Vercel, backend to Railway)
-
-### Working with Game Logic
-Game logic is located in the canvas-based game components. To integrate new game code:
-1. Extract HTML game files
-2. Convert to React hooks
-3. Wrap with memory persistence
-4. Test memory sync end-to-end
-
-## Troubleshooting
-
-### MongoDB Connection Failed
-- Verify connection string in .env
-- Check IP Access List in MongoDB Atlas
-- Ensure database user has correct credentials
-
-### CORS Errors
-- Verify `CORS_ORIGIN` in backend .env matches frontend URL
-- Check that backend is running
-
-### Memory Not Persisting
-- Verify backend is connected to MongoDB
-- Check browser console for errors
-- Verify player ID is being set correctly
-
-## Phase Checklist
-
-- [x] Phase 1: Foundation (Complete)
-  - [x] React + Express + MongoDB boilerplate
-  - [x] Environment setup
-  - [x] Player session system
-  - [x] CORS configuration
-  - [x] Health check endpoint
-
-- [ ] Phase 2: Landing Page
-- [ ] Phase 3: Game Containerization
-- [ ] Phase 4: Backend Memory API (Partial - endpoints created)
-- [ ] Phase 5: Integration & Testing
-- [ ] Phase 6: Deployment
-
-## Contributing
-
-This is an MVP project. Focus on core functionality first, polish later.
+Each phase must independently pass testing and remain production-ready before the next begins.
 
 ## License
 
-MIT
+MIT (platform code). Individual game plugins carry their own upstream licenses — see `THIRD_PARTY_NOTICES.md` (added when the first plugin lands in Phase 10) and `PLATFORM_REDESIGN_PROPOSAL.md` §2 for the compliance approach.

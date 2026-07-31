@@ -1,0 +1,12 @@
+{
+  "name": "@adaptive-ai/player-intelligence",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Cross-game player profile aggregation — owns the canonical PlayerProfile",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run --root ."
+  }
+}

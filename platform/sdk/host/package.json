@@ -1,0 +1,12 @@
+{
+  "name": "@adaptive-ai/sdk-host",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Game SDK — runs in the parent frame, mounts plugins and enforces the fairness boundary",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "test": "vitest run --root ."
+  }
+}
