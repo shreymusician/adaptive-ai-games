@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { AxiosInstance } from 'axios';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const TOKEN_KEY = 'auth_token';
 
 const api: AxiosInstance = axios.create({
   baseURL: API_URL,
@@ -10,10 +11,29 @@ const api: AxiosInstance = axios.create({
   },
 });
 
-export interface Player {
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export const tokenStorage = {
+  get: (): string | null => localStorage.getItem(TOKEN_KEY),
+  set: (token: string): void => localStorage.setItem(TOKEN_KEY, token),
+  clear: (): void => localStorage.removeItem(TOKEN_KEY),
+};
+
+export interface User {
   id: string;
-  sessionId: string;
+  email: string;
   name: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
 }
 
 export interface GameMemoryResponse {
@@ -21,7 +41,6 @@ export interface GameMemoryResponse {
 }
 
 export interface StatsResponse {
-  playerId: string;
   gameType: string;
   totalMatches: number;
   wins: number;
@@ -29,26 +48,31 @@ export interface StatsResponse {
   winRate: string;
 }
 
-export const playerAPI = {
-  create: (sessionId: string, name: string): Promise<Player> =>
-    api.post('/player', { sessionId, name }).then((res) => res.data),
+export const authAPI = {
+  signup: (email: string, password: string, name: string): Promise<AuthResponse> =>
+    api.post('/auth/signup', { email, password, name }).then((res) => res.data),
 
-  get: (sessionId: string): Promise<Player> =>
-    api.get(`/player/${sessionId}`).then((res) => res.data),
+  login: (email: string, password: string): Promise<AuthResponse> =>
+    api.post('/auth/login', { email, password }).then((res) => res.data),
+
+  loginWithGoogle: (idToken: string): Promise<AuthResponse> =>
+    api.post('/auth/google', { idToken }).then((res) => res.data),
+
+  me: (): Promise<{ user: User }> => api.get('/auth/me').then((res) => res.data),
 };
 
 export const memoryAPI = {
-  get: (playerId: string, gameType: string): Promise<GameMemoryResponse> =>
-    api.get(`/memory/${playerId}/${gameType}`).then((res) => res.data),
+  get: (gameType: string): Promise<GameMemoryResponse> =>
+    api.get(`/memory/${gameType}`).then((res) => res.data),
 
-  save: (playerId: string, gameType: string, data: Record<string, any>) =>
-    api.post(`/memory/${playerId}/${gameType}`, { data }).then((res) => res.data),
+  save: (gameType: string, data: Record<string, any>) =>
+    api.post(`/memory/${gameType}`, { data }).then((res) => res.data),
 
-  logMatch: (playerId: string, gameType: string, won: boolean, duration: number) =>
-    api.post('/match', { playerId, gameType, won, duration }).then((res) => res.data),
+  logMatch: (gameType: string, won: boolean, duration: number) =>
+    api.post('/match', { gameType, won, duration }).then((res) => res.data),
 
-  getStats: (playerId: string, gameType: string): Promise<StatsResponse> =>
-    api.get(`/stats/${playerId}/${gameType}`).then((res) => res.data),
+  getStats: (gameType: string): Promise<StatsResponse> =>
+    api.get(`/stats/${gameType}`).then((res) => res.data),
 };
 
 export const healthAPI = {

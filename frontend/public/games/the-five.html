@@ -163,6 +163,8 @@ body.touch #touch{display:block}
    ========================================================= */
 const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
 const W=760,H=760, CX=W/2, CY=H/2, ARENA=340;
+const DPR=Math.min(window.devicePixelRatio||1,3);
+cv.width=W*DPR; cv.height=H*DPR; ctx.scale(DPR,DPR);
 const TAU=Math.PI*2;
 const $=id=>document.getElementById(id);
 const rand=(a,b)=>a+Math.random()*(b-a);
@@ -203,11 +205,11 @@ const blank=()=>({
 let mem=blank(), canSave=false;
 
 async function loadMem(){
-  try{ const r=await window.storage.get(KEY); if(r&&r.value) mem=Object.assign(blank(),JSON.parse(r.value)); canSave=true; }
-  catch(e){ canSave = typeof window.storage!=='undefined'; }
+  try{ const raw=localStorage.getItem(KEY); if(raw) mem=Object.assign(blank(),JSON.parse(raw)); canSave=true; }
+  catch(e){ canSave=false; }
   paintRunTag();
 }
-async function saveMem(){ if(!canSave)return; try{ await window.storage.set(KEY,JSON.stringify(mem)); }catch(e){} }
+async function saveMem(){ if(!canSave)return; try{ localStorage.setItem(KEY,JSON.stringify(mem)); }catch(e){} }
 
 function read(){
   const totalHits=ROLES.reduce((s,r)=>s+mem.hits[r],0);
@@ -284,6 +286,7 @@ function inputY(){ return (keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.Arrow
 let AC=null;
 function blip(f,d,type,vol){
   try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended') AC.resume();
     const o=AC.createOscillator(),g=AC.createGain();
     o.type=type||'square'; o.frequency.value=f;
     g.gain.setValueAtTime(vol||.06,AC.currentTime);
@@ -826,13 +829,21 @@ function updateHud(){
 /* =========================================================
    LOOP
    ========================================================= */
-function tick(){
-  requestAnimationFrame(tick);
+const STEP=1000/60; let accumulator=0, lastTs=null;
+function simulate(){
   if(callout){ callout.life--; if(callout.life<=0) callout=null; }
   if(state==='play'){
     if(freeze>0){ freeze--; } else { stepBoss(); stepHeroes(); }
     updateHud();
   }
+}
+function tick(ts){
+  requestAnimationFrame(tick);
+  if(lastTs===null) lastTs=ts;
+  let dt=ts-lastTs; lastTs=ts;
+  if(dt>250) dt=250; // clamp huge gaps (tab switch, slow device) to avoid a spiral of death
+  accumulator+=dt;
+  while(accumulator>=STEP){ simulate(); accumulator-=STEP; }
   draw();
 }
 
@@ -924,11 +935,11 @@ $('btnAgain').addEventListener('click',start);
 $('btnFile').addEventListener('click',openFile);
 $('btnFileClose').addEventListener('click',closeFile);
 $('btnWipe').addEventListener('click',async()=>{
-  mem=blank(); try{await window.storage.delete(KEY);}catch(e){}
+  mem=blank(); try{localStorage.removeItem(KEY);}catch(e){}
   paintRunTag(); $('btnWipe').textContent='ERASED — THEY KNOW NOTHING';
 });
 
-reset(); loadMem(); tick();
+reset(); loadMem(); requestAnimationFrame(tick);
 </script>
 </body>
 </html>

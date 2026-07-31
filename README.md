@@ -100,23 +100,24 @@ Frontend runs on `http://localhost:5173`
 ### Step 4: Test the Application
 
 1. Navigate to `http://localhost:5173`
-2. Enter a player name
-3. Click into WARDEN or THE FIVE
-4. Click "Test Save Memory" to verify backend connectivity
-5. Click "Test Log Match" to log a match result
-6. Refresh the page — memory should persist
+2. You'll be redirected to `/login` — click "Sign up" to create an account (email/password), or use "Sign in with Google" if `VITE_GOOGLE_CLIENT_ID` is configured
+3. Click into WARDEN or THE FIVE to play
+4. Log out and log back in — your match history and stats on the landing page should persist
 
 ## API Endpoints
 
 ### Authentication
-- `POST /api/player` - Create/get player by session ID
-- `GET /api/player/:sessionId` - Fetch player info
+- `POST /api/auth/signup` - Create an account with email/password
+- `POST /api/auth/login` - Log in with email/password
+- `POST /api/auth/google` - Log in / sign up with a Google ID token
+- `GET /api/auth/me` - Fetch the current authenticated user (requires `Authorization: Bearer <token>`)
 
 ### Memory Management
-- `GET /api/memory/:playerId/:gameType` - Load game memory
-- `POST /api/memory/:playerId/:gameType` - Save game memory
+All routes below require `Authorization: Bearer <token>` and operate on the authenticated user's own data.
+- `GET /api/memory/:gameType` - Load game memory
+- `POST /api/memory/:gameType` - Save game memory
 - `POST /api/match` - Log a completed match
-- `GET /api/stats/:playerId/:gameType` - Get player statistics
+- `GET /api/stats/:gameType` - Get player statistics
 
 ### Health
 - `GET /api/health` - Server health check
@@ -130,21 +131,29 @@ MONGODB_DB_NAME=adaptive-games
 NODE_ENV=development
 PORT=5000
 CORS_ORIGIN=http://localhost:5173
+JWT_SECRET=a-long-random-string
+GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
 ```
 
 ### Frontend (.env)
 ```
 VITE_API_URL=http://localhost:5000/api
+VITE_GOOGLE_CLIENT_ID=your-google-oauth-client-id.apps.googleusercontent.com
 ```
+
+Google Sign-In requires an OAuth 2.0 Client ID from [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (type "Web application", with your frontend URL added as an authorized JavaScript origin). Use the same client ID for both `GOOGLE_CLIENT_ID` (backend) and `VITE_GOOGLE_CLIENT_ID` (frontend).
 
 ## Database Schema
 
 ### Players Collection
+Each document is a player's account. `passwordHash` is set for email/password accounts; `googleId` is set for Google accounts (an account may have either or both).
 ```javascript
 {
   _id: ObjectId,
-  sessionId: string,
+  email: string,
   name: string,
+  passwordHash: string,   // optional
+  googleId: string,       // optional
   createdAt: Date,
   updatedAt: Date
 }
