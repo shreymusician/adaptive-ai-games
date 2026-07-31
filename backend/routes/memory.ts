@@ -1,27 +1,27 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import GameMemory, { GameType } from '../models/GameMemory';
-import GameSession, { IGameSession } from '../models/GameSession';
+import GameSession from '../models/GameSession';
+import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = Router();
+router.use(authenticateToken);
 
 interface MemoryBody {
-  playerId: string;
   data: Record<string, any>;
 }
 
 interface MatchBody {
-  playerId: string;
   gameType: GameType;
   won: boolean;
   duration: number;
 }
 
-router.get('/memory/:playerId/:gameType', async (req: Request, res: Response): Promise<void> => {
+router.get('/memory/:gameType', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { playerId, gameType } = req.params;
+    const { gameType } = req.params;
 
     const memory = await GameMemory.findOne({
-      playerId,
+      playerId: req.userId,
       gameType: gameType as GameType,
     });
 
@@ -37,9 +37,9 @@ router.get('/memory/:playerId/:gameType', async (req: Request, res: Response): P
   }
 });
 
-router.post('/memory/:playerId/:gameType', async (req: Request, res: Response): Promise<void> => {
+router.post('/memory/:gameType', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { playerId, gameType } = req.params;
+    const { gameType } = req.params;
     const { data } = req.body as MemoryBody;
 
     if (!data) {
@@ -48,13 +48,13 @@ router.post('/memory/:playerId/:gameType', async (req: Request, res: Response): 
     }
 
     let memory = await GameMemory.findOne({
-      playerId,
+      playerId: req.userId,
       gameType: gameType as GameType,
     });
 
     if (!memory) {
       memory = new GameMemory({
-        playerId,
+        playerId: req.userId,
         gameType: gameType as GameType,
         data,
       });
@@ -74,24 +74,24 @@ router.post('/memory/:playerId/:gameType', async (req: Request, res: Response): 
   }
 });
 
-router.post('/match', async (req: Request, res: Response): Promise<void> => {
+router.post('/match', async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const { playerId, gameType, won, duration } = req.body as MatchBody;
+    const { gameType, won, duration } = req.body as MatchBody;
 
-    if (!playerId || !gameType || typeof won !== 'boolean' || !duration) {
+    if (!gameType || typeof won !== 'boolean' || !duration) {
       res.status(400).json({ error: 'Missing required fields' });
       return;
     }
 
     const lastSession = await GameSession.findOne({
-      playerId,
+      playerId: req.userId,
       gameType,
     }).sort({ matchNumber: -1 });
 
     const matchNumber = (lastSession?.matchNumber || 0) + 1;
 
     const session = new GameSession({
-      playerId,
+      playerId: req.userId,
       gameType,
       matchNumber,
       won,
@@ -111,12 +111,12 @@ router.post('/match', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-router.get('/stats/:playerId/:gameType', async (req: Request, res: Response) => {
+router.get('/stats/:gameType', async (req: AuthRequest, res: Response) => {
   try {
-    const { playerId, gameType } = req.params;
+    const { gameType } = req.params;
 
     const sessions = await GameSession.find({
-      playerId,
+      playerId: req.userId,
       gameType: gameType as GameType,
     });
 
@@ -125,7 +125,6 @@ router.get('/stats/:playerId/:gameType', async (req: Request, res: Response) => 
     const winRate = total > 0 ? (wins / total) * 100 : 0;
 
     res.json({
-      playerId,
       gameType,
       totalMatches: total,
       wins,
