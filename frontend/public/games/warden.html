@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>WARDEN — it remembers how you move</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#100D1B;
+  --floor:#181330;
+  --line:#2A2246;
+  --you:#7BE8E0;
+  --boss:#FF5A47;
+  --warn:#FFC34D;
+  --bone:#EDE9F5;
+  --dim:#8279A6;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--void);color:var(--bone);
+  font-family:"Chakra Petch",system-ui,sans-serif;user-select:none;touch-action:none}
+#wrap{position:relative;width:100vw;height:100dvh;display:grid;place-items:center}
+#stage{position:relative;width:min(96vw,96dvh,760px);aspect-ratio:1}
+canvas{width:100%;height:100%;display:block;background:var(--floor);
+  border:1px solid var(--line);border-radius:2px;box-shadow:0 0 60px rgba(255,90,71,.10),inset 0 0 90px rgba(0,0,0,.55)}
+
+/* ---------- HUD ---------- */
+#hud{position:absolute;inset:8px 10px auto 10px;pointer-events:none;font-family:"IBM Plex Mono",monospace}
+.bar{height:8px;background:rgba(0,0,0,.45);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;transition:width .12s linear}
+#hpYou i{background:var(--you);box-shadow:0 0 10px var(--you)}
+#hpBoss i{background:var(--boss);box-shadow:0 0 10px var(--boss);margin-left:auto}
+.lbl{display:flex;justify-content:space-between;font-size:9.5px;letter-spacing:.18em;color:var(--dim);margin-bottom:3px}
+#bossWrap{margin-bottom:9px}
+#youWrap{width:44%}
+#runTag{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-family:"IBM Plex Mono",monospace;
+  font-size:9.5px;letter-spacing:.2em;color:var(--dim);pointer-events:none;text-align:center;line-height:1.6}
+#runTag b{color:var(--warn);font-weight:600}
+
+/* ---------- overlays ---------- */
+.screen{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;
+  background:rgba(16,13,27,.93);backdrop-filter:blur(3px);z-index:5}
+.screen.hide{display:none}
+.screen h1{font-size:clamp(30px,7vw,58px);margin:0;letter-spacing:.04em;line-height:1;font-weight:700}
+.screen h1 span{color:var(--boss)}
+.kick{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.22em;color:var(--dim);margin-bottom:10px}
+.screen p{max-width:44ch;margin:14px auto 0;font-size:14px;line-height:1.6;color:#C4BDDD}
+.learned{margin:18px auto 0;max-width:46ch;text-align:left;font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.55}
+.learned div{border-left:2px solid var(--boss);padding:6px 0 6px 11px;margin-bottom:7px;color:#C4BDDD}
+.learned b{color:var(--warn);font-weight:600}
+.keys{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--dim);margin-top:18px;line-height:2}
+.keys kbd{background:var(--line);border:1px solid #3b3163;border-radius:3px;padding:2px 7px;color:var(--bone);font-size:10.5px}
+button.go{margin-top:22px;font-family:"Chakra Petch";font-weight:700;font-size:15px;letter-spacing:.12em;
+  background:var(--boss);color:#1A0B08;border:0;padding:13px 34px;cursor:pointer;border-radius:2px}
+button.go:hover{filter:brightness(1.12)}
+button.go:focus-visible{outline:2px solid var(--warn);outline-offset:3px}
+.wipe{margin-top:12px;background:none;border:1px solid var(--line);color:var(--dim);
+  font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.16em;padding:8px 16px;cursor:pointer;border-radius:2px}
+.wipe:hover{color:var(--boss);border-color:var(--boss)}
+.mastery{color:var(--warn)!important}
+
+.filebody{width:min(86vw,440px);text-align:left;margin:14px auto 0;font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.frow{margin-bottom:13px}
+.frow .flabel{display:flex;justify-content:space-between;gap:10px;color:var(--dim);letter-spacing:.05em;margin-bottom:4px}
+.frow .flabel b{color:var(--bone);font-weight:600}
+.ftrack{height:7px;background:rgba(0,0,0,.4);border:1px solid var(--line)}
+.ftrack i{display:block;height:100%;background:var(--boss)}
+.fempty{color:var(--dim);font-style:italic;font-size:12.5px;text-align:center}
+
+/* ---------- touch ---------- */
+#touch{position:absolute;inset:0;z-index:3;display:none}
+.tbtn{position:absolute;bottom:16px;width:74px;height:74px;border-radius:50%;
+  border:1px solid var(--line);background:rgba(40,32,70,.5);display:grid;place-items:center;
+  font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;color:var(--bone)}
+#bAtk{right:14px;border-color:var(--boss)}
+#bDash{right:98px;border-color:var(--you)}
+#bFile{left:14px;top:76px;bottom:auto;width:50px;height:50px;font-size:8px;border-color:var(--warn);color:var(--warn)}
+.tbtn:active{background:rgba(255,90,71,.28)}
+#stickBase{position:absolute;width:104px;height:104px;border-radius:50%;border:1px solid var(--line);
+  opacity:0;pointer-events:none}
+#stickNub{position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(123,232,224,.35);
+  border:1px solid var(--you);opacity:0;pointer-events:none}
+body.touch #touch{display:block}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="cv" width="760" height="760"></canvas>
+
+  <div id="hud">
+    <div id="bossWrap">
+      <div class="lbl"><span>THE WARDEN</span><span id="bossNum">300</span></div>
+      <div class="bar" id="hpBoss"><i style="width:100%"></i></div>
+    </div>
+    <div id="youWrap">
+      <div class="lbl"><span>YOU</span><span id="youNum">100</span></div>
+      <div class="bar" id="hpYou"><i style="width:100%"></i></div>
+    </div>
+  </div>
+  <div id="runTag"></div>
+
+  <div id="touch">
+    <div id="stickBase"></div><div id="stickNub"></div>
+    <div class="tbtn" id="bDash">DASH</div>
+    <div class="tbtn" id="bAtk">HIT</div>
+    <div class="tbtn" id="bFile">FILE</div>
+  </div>
+
+  <!-- start -->
+  <div class="screen" id="scStart">
+    <div>
+      <div class="kick">CELL 7 · IT HAS BEEN WAITING</div>
+      <h1>THE <span>WARDEN</span></h1>
+      <p>It does not get faster or stronger when you die. It gets <b>better at you</b> — the way you roll, the range you like, how early you panic.</p>
+      <p class="mastery" id="masteryNote" style="display:none"></p>
+      <div class="keys" id="keyHelp"></div>
+      <button class="go" id="btnStart">STEP IN</button><br>
+      <button class="wipe" id="btnFile">VIEW THE FILE</button>
+      <button class="wipe" id="btnWipe">ERASE WHAT IT KNOWS</button>
+    </div>
+  </div>
+
+  <!-- end -->
+  <div class="screen hide" id="scEnd">
+    <div>
+      <div class="kick" id="endKick"></div>
+      <h1 id="endTitle"></h1>
+      <div class="learned" id="endLearned"></div>
+      <button class="go" id="btnAgain">GO AGAIN</button>
+    </div>
+  </div>
+
+  <!-- file dossier -->
+  <div class="screen hide" id="scFile">
+    <div>
+      <div class="kick">SUBJECT FILE · <span id="fileRuns">0</span> RUNS ON RECORD</div>
+      <h1 style="font-size:clamp(24px,5.5vw,38px)">WHAT IT <span>KNOWS</span></h1>
+      <div class="filebody" id="fileBody"></div>
+      <button class="go" id="btnFileClose">CLOSE</button>
+    </div>
+  </div>
+</div></div>
+
+<script>
+/* =========================================================
+   SETUP
+   ========================================================= */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const W=760,H=760, CX=W/2, CY=H/2, ARENA=340;
+const TAU=Math.PI*2;
+const $=id=>document.getElementById(id);
+const rand=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function angDiff(a,b){let d=(a-b)%TAU; if(d>Math.PI)d-=TAU; if(d<-Math.PI)d+=TAU; return d;}
+
+if(matchMedia('(pointer:coarse)').matches) document.body.classList.add('touch');
+const isTouch=document.body.classList.contains('touch');
+$('keyHelp').innerHTML = isTouch
+  ? 'Drag the left side to move<br>Tap <kbd>HIT</kbd> to swing · <kbd>DASH</kbd> to roll<br>Tap <kbd>FILE</kbd> to see what it knows'
+  : '<kbd>WASD</kbd> / <kbd>↑←↓→</kbd> move<br><kbd>Space</kbd> roll (invincible) · <kbd>J</kbd> or <kbd>click</kbd> swing<br><kbd>Tab</kbd> view its file on you';
+
+/* =========================================================
+   MEMORY — survives death and page reload
+   ========================================================= */
+const KEY='warden-memory-v1';
+const blank=()=>({
+  runs:0, kills:0, bestHp:0,
+  roll:{away:0,into:0,left:0,right:0},   // roll direction vs the boss
+  rangeSum:0, rangeN:0,                  // where you like to stand
+  early:0, late:0,                       // roll timing vs its wind-up
+  greedy:0, swings:0                     // swinging inside its recovery
+});
+let mem=blank(), canSave=false;
+
+async function loadMem(){
+  try{ const r=await window.storage.get(KEY); if(r&&r.value) mem=Object.assign(blank(),JSON.parse(r.value)); canSave=true; }
+  catch(e){ canSave = typeof window.storage!=='undefined'; }
+  paintRunTag();
+}
+async function saveMem(){ if(!canSave)return; try{ await window.storage.set(KEY,JSON.stringify(mem)); }catch(e){} }
+
+/* --- derived read on the player --- */
+function read(){
+  const r=mem.roll, tot=r.away+r.into+r.left+r.right;
+  let fav='none',favP=0;
+  if(tot>=6){ for(const k in r){ if(r[k]/tot>favP){favP=r[k]/tot;fav=k;} } }
+  const avgRange = mem.rangeN>40 ? mem.rangeSum/mem.rangeN : 0;
+  const timing   = (mem.early+mem.late)>=6 ? mem.early/(mem.early+mem.late) : 0;
+  const greed    = mem.swings>=10 ? mem.greedy/mem.swings : 0;
+  const depth    = 1-Math.exp(-mem.runs/2.6);          // how much it trusts the file
+  return {fav,favP,tot,avgRange,timing,greed,depth};
+}
+
+/* =========================================================
+   INPUT
+   ========================================================= */
+const keys={}, mouse={x:CX,y:CY-100,down:false};
+addEventListener('keydown',e=>{
+  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(e.code))e.preventDefault();
+  if(e.code==='Tab'||e.code==='KeyF'){
+    if(state==='file') closeFile(); else if(state==='play'||state==='menu') openFile();
+    return;
+  }
+  keys[e.code]=true;
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();
+  mouse.x=(e.clientX-r.left)/r.width*W; mouse.y=(e.clientY-r.top)/r.height*H;});
+cv.addEventListener('mousedown',()=>{if(state==='play')swing();});
+
+let stick={active:false,id:null,dx:0,dy:0};
+const base=$('stickBase'),nub=$('stickNub');
+function stickStart(t){
+  const r=$('stage').getBoundingClientRect();
+  stick.active=true; stick.id=t.identifier; stick.ox=t.clientX-r.left; stick.oy=t.clientY-r.top;
+  base.style.cssText=`left:${stick.ox-52}px;top:${stick.oy-52}px;opacity:.7`;
+  nub.style.cssText=`left:${stick.ox-22}px;top:${stick.oy-22}px;opacity:1`;
+}
+function stickMove(t){
+  const r=$('stage').getBoundingClientRect();
+  let dx=(t.clientX-r.left)-stick.ox, dy=(t.clientY-r.top)-stick.oy;
+  const m=Math.hypot(dx,dy)||1, cl=Math.min(m,46);
+  stick.dx=dx/m*(cl/46); stick.dy=dy/m*(cl/46);
+  nub.style.left=(stick.ox+dx/m*cl-22)+'px'; nub.style.top=(stick.oy+dy/m*cl-22)+'px';
+}
+function stickEnd(){stick.active=false;stick.dx=stick.dy=0;base.style.opacity=0;nub.style.opacity=0;}
+$('touch').addEventListener('touchstart',e=>{
+  for(const t of e.changedTouches){
+    const r=$('stage').getBoundingClientRect();
+    if(t.clientX-r.left < r.width*0.55 && !stick.active) stickStart(t);
+  }
+},{passive:true});
+$('touch').addEventListener('touchmove',e=>{
+  for(const t of e.changedTouches) if(t.identifier===stick.id) stickMove(t);
+},{passive:true});
+$('touch').addEventListener('touchend',e=>{
+  for(const t of e.changedTouches) if(t.identifier===stick.id) stickEnd();
+},{passive:true});
+$('bAtk').addEventListener('touchstart',e=>{e.preventDefault();swing();});
+$('bDash').addEventListener('touchstart',e=>{e.preventDefault();roll();});
+$('bFile').addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();
+  if(state==='file')closeFile(); else openFile();});
+
+/* =========================================================
+   AUDIO — tiny, no assets
+   ========================================================= */
+let AC=null;
+function blip(f,d,type,vol){
+  try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type=type||'square'; o.frequency.value=f;
+    g.gain.setValueAtTime(vol||.06,AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);
+    o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime+d);
+  }catch(e){}
+}
+
+let callout=null;
+function say(text){ callout={text,life:70}; }
+
+/* =========================================================
+   ENTITIES
+   ========================================================= */
+let you,boss,shots,bits,shake,freeze,state='menu',learnedNotes=[];
+
+function reset(){
+  you={x:CX,y:CY+180,r:11,hp:100,vx:0,vy:0,face:-Math.PI/2,
+       rolling:0,rollCd:0,inv:0,swingCd:0,swingT:0,hurt:0,rdx:0,rdy:0};
+  boss={x:CX,y:CY-90,r:30,hp:300,max:300,st:'idle',t:0,dur:50,atk:null,
+        aim:0,tx:0,ty:0,hurt:0,feint:false,combo:0,pulse:0,willParry:false,parried:false};
+  shots=[]; bits=[]; shake=0; freeze=0; learnedNotes=[]; callout=null;
+  runRange=0; runRangeN=0; parriesThisRun=0;
+}
+let runRange=0,runRangeN=0,parriesThisRun=0;
+
+function spark(x,y,n,col,spd){
+  for(let i=0;i<n;i++){const a=rand(0,TAU),s=rand(1,spd||4);
+    bits.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(14,30),col});}
+}
+
+/* =========================================================
+   PLAYER
+   ========================================================= */
+function roll(){
+  if(state!=='play'||you.rolling>0||you.rollCd>0)return;
+  let dx=inputX(),dy=inputY();
+  if(!dx&&!dy){dx=Math.cos(you.face);dy=Math.sin(you.face);}
+  const m=Math.hypot(dx,dy)||1; dx/=m; dy/=m;
+  you.rolling=13; you.rollCd=34; you.inv=11; you.rdx=dx; you.rdy=dy;
+  blip(220,.09,'sine',.05);
+
+  // ---- THE FILE: which way did you go, relative to the boss? ----
+  const bx=(you.x-boss.x), by=(you.y-boss.y), bm=Math.hypot(bx,by)||1;
+  const ax=bx/bm, ay=by/bm;                 // unit vector pointing away from boss
+  const dot=dx*ax+dy*ay;                    // +1 away, -1 into
+  const cross=ax*dy-ay*dx;                  // sign = which side
+  if(dot>0.55)      mem.roll.away++;
+  else if(dot<-0.55)mem.roll.into++;
+  else if(cross>0)  mem.roll.right++;
+  else              mem.roll.left++;
+
+  // ---- did you roll early or late in its wind-up? ----
+  if(boss.st==='wind'){ (boss.t/boss.dur < 0.55) ? mem.early++ : mem.late++; }
+}
+function swing(){
+  if(state!=='play'||you.swingCd>0||you.rolling>0)return;
+  you.swingCd=24; you.swingT=7; blip(660,.06,'square',.05);
+  mem.swings++; if(boss.st==='rest') mem.greedy++;   // punishing its recovery
+}
+function inputX(){ return (keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+stick.dx; }
+function inputY(){ return (keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0)+stick.dy; }
+
+function stepPlayer(){
+  if(keys.Space)roll();
+  if(keys.KeyJ)swing();
+  you.rollCd=Math.max(0,you.rollCd-1);
+  you.swingCd=Math.max(0,you.swingCd-1);
+  you.swingT=Math.max(0,you.swingT-1);
+  you.inv=Math.max(0,you.inv-1);
+  you.hurt=Math.max(0,you.hurt-1);
+
+  if(you.rolling>0){
+    you.rolling--;
+    const s=7.4*(you.rolling/13)+2.2;
+    you.x+=you.rdx*s; you.y+=you.rdy*s;
+    if(you.rolling%2===0) bits.push({x:you.x,y:you.y,vx:0,vy:0,life:12,col:'123,232,224'});
+  }else{
+    let dx=inputX(),dy=inputY(); const m=Math.hypot(dx,dy);
+    if(m>0.15){ dx/=m;dy/=m; you.x+=dx*3.05; you.y+=dy*3.05; you.face=Math.atan2(dy,dx); }
+  }
+  if(!isTouch) you.face=Math.atan2(mouse.y-you.y,mouse.x-you.x);
+
+  // arena wall
+  const d=Math.hypot(you.x-CX,you.y-CY);
+  if(d>ARENA-you.r){const a=Math.atan2(you.y-CY,you.x-CX);
+    you.x=CX+Math.cos(a)*(ARENA-you.r); you.y=CY+Math.sin(a)*(ARENA-you.r);}
+
+  // record preferred range
+  runRange+=dist(you,boss); runRangeN++;
+
+  // your hitbox
+  if(you.swingT===6){
+    const d2=dist(you,boss);
+    if(d2<boss.r+52 && Math.abs(angDiff(Math.atan2(boss.y-you.y,boss.x-you.x),you.face))<0.9){
+      hurtBoss(14);
+    }
+  }
+}
+function hurtBoss(n){
+  boss.hp-=n; boss.hurt=7; shake=Math.max(shake,7); freeze=4;
+  spark(boss.x,boss.y,10,'255,90,71',5); blip(140,.09,'sawtooth',.05);
+  if(boss.hp<=0) end(true);
+}
+function hurtYou(n){
+  if(you.inv>0||you.hurt>0)return;
+  you.hp-=n; you.hurt=26; you.inv=22; shake=12; freeze=6;
+  spark(you.x,you.y,14,'123,232,224',5); blip(90,.18,'sawtooth',.07);
+  if(you.hp<=0) end(false);
+}
+function triggerParry(){
+  boss.parried=true; boss.st='parry'; boss.t=0; boss.dur=14;
+  parriesThisRun++; shake=Math.max(shake,10);
+  blip(180,.15,'sawtooth',.08); spark(boss.x,boss.y,16,'255,195,77',5);
+  say('IT REMEMBERS THE OPENING');
+}
+
+/* =========================================================
+   THE WARDEN
+   ========================================================= */
+function pickAttack(){
+  const R=read(), d=dist(you,boss);
+  const w={sweep:1,lunge:1,slam:1,zone:1};
+  // reads your comfort range
+  if(d>210){ w.lunge+=2.6; w.zone+=1.8; w.sweep-=.6; }
+  else     { w.sweep+=2.2; w.slam+=1.7; w.zone-=.6; }
+  if(R.avgRange>200) w.lunge+=1.6*R.depth;
+  if(R.avgRange&&R.avgRange<140) w.slam+=1.6*R.depth;
+  if(R.fav==='away') w.zone+=1.5*R.depth;   // you back off → it covers the ground
+  if(R.fav==='into') w.slam+=1.5*R.depth;   // you close → it drops it on you
+  let tot=0; for(const k in w){w[k]=Math.max(.15,w[k]); tot+=w[k];}
+  let x=Math.random()*tot;
+  for(const k in w){ if((x-=w[k])<=0) return k; }
+  return 'sweep';
+}
+
+// where it expects you to be when the blow lands
+function leadTarget(frames){
+  const R=read();
+  const bx=you.x-boss.x, by=you.y-boss.y, bm=Math.hypot(bx,by)||1;
+  const ax=bx/bm, ay=by/bm;               // away
+  const px=-ay,  py=ax;                   // its right
+  let vx=0,vy=0;
+  const lead = 6.2*frames*R.favP*R.depth; // only leads as hard as the file allows
+  if(R.fav==='away'){vx=ax;vy=ay;}
+  else if(R.fav==='into'){vx=-ax;vy=-ay;}
+  else if(R.fav==='right'){vx=px;vy=py;}
+  else if(R.fav==='left'){vx=-px;vy=-py;}
+  return {x:clampArena(you.x+vx*lead), y:clampArena(you.y+vy*lead,true)};
+}
+function clampArena(v,isY){
+  const c=isY?CY:CX; return clamp(v,c-ARENA+30,c+ARENA-30);
+}
+
+function stepBoss(){
+  boss.hurt=Math.max(0,boss.hurt-1);
+  boss.pulse+=0.06;
+  const R=read();
+  boss.t++;
+
+  if(boss.st==='idle'){
+    // drift toward a comfortable distance
+    const d=dist(you,boss), want=150;
+    const a=Math.atan2(you.y-boss.y,you.x-boss.x);
+    const sp=(d>want?1:-1)*0.95*(1+0.35*R.depth);
+    boss.x+=Math.cos(a)*sp; boss.y+=Math.sin(a)*sp;
+    const dd=Math.hypot(boss.x-CX,boss.y-CY);
+    if(dd>ARENA-boss.r){const b=Math.atan2(boss.y-CY,boss.x-CX);
+      boss.x=CX+Math.cos(b)*(ARENA-boss.r); boss.y=CY+Math.sin(b)*(ARENA-boss.r);}
+    if(boss.t>=boss.dur){
+      boss.atk=pickAttack(); boss.st='wind'; boss.t=0;
+      // if you bail early, it holds the swing — a feint
+      boss.feint = R.timing>0.62 && Math.random()<R.timing*R.depth;
+      const base={sweep:40,lunge:36,slam:44,zone:38}[boss.atk];
+      boss.dur = base + (boss.feint?26:0);
+      const L=leadTarget(boss.dur*0.6);
+      boss.aim=Math.atan2(L.y-boss.y,L.x-boss.x);
+      boss.tx=L.x; boss.ty=L.y;
+      blip(boss.feint?300:420,.07,'triangle',.035);
+    }
+  }
+  else if(boss.st==='wind'){
+    if(boss.atk==='slam'||boss.atk==='zone'){ /* target already locked */ }
+    if(boss.t>=boss.dur){
+      boss.st='act'; boss.t=0;
+      boss.dur={sweep:26,lunge:20,slam:12,zone:10}[boss.atk];
+      if(boss.atk==='zone'){
+        for(let i=-2;i<=2;i++){
+          const a=boss.aim+i*0.22;
+          shots.push({x:boss.x,y:boss.y,vx:Math.cos(a)*4.6,vy:Math.sin(a)*4.6,r:8,life:150});
+        }
+        blip(520,.1,'square',.04);
+      }
+      if(boss.atk==='lunge') blip(200,.12,'sawtooth',.05);
+    }
+  }
+  else if(boss.st==='act'){
+    const p=boss.t/boss.dur;
+    if(boss.atk==='sweep'){
+      const a=boss.aim-1.05+p*2.10, d=dist(you,boss);
+      if(d<boss.r+95 && Math.abs(angDiff(Math.atan2(you.y-boss.y,you.x-boss.x),a))<0.42) hurtYou(15);
+    }
+    if(boss.atk==='lunge'){
+      boss.x+=Math.cos(boss.aim)*11; boss.y+=Math.sin(boss.aim)*11;
+      spark(boss.x,boss.y,2,'255,90,71',2);
+      if(dist(you,boss)<you.r+boss.r+2) hurtYou(18);
+      const dd=Math.hypot(boss.x-CX,boss.y-CY);
+      if(dd>ARENA-boss.r){const b=Math.atan2(boss.y-CY,boss.x-CX);
+        boss.x=CX+Math.cos(b)*(ARENA-boss.r); boss.y=CY+Math.sin(b)*(ARENA-boss.r); boss.t=boss.dur;}
+    }
+    if(boss.atk==='slam'&&boss.t===6){
+      shake=14; spark(boss.tx,boss.ty,22,'255,195,77',6); blip(70,.2,'sawtooth',.07);
+      if(Math.hypot(you.x-boss.tx,you.y-boss.ty)<78) hurtYou(20);
+    }
+    if(boss.t>=boss.dur){
+      boss.st='rest'; boss.t=0;
+      // it presses the advantage if you keep swinging into its recovery
+      boss.dur = Math.round(46 - 22*R.greed*R.depth);
+      boss.parried=false;
+      // only after enough runs does it trust the read enough to gamble on a parry
+      boss.willParry = mem.runs>=3 && Math.random() < clamp(R.greed*R.depth*1.5,0,0.6);
+    }
+  }
+  else if(boss.st==='rest'){
+    if(boss.willParry && !boss.parried && boss.t>8 && boss.t<boss.dur-4 && you.swingT>=6){
+      triggerParry();
+    }else if(boss.t>=boss.dur){
+      boss.st='idle'; boss.t=0; boss.dur=rand(28,52)-14*R.depth;
+    }
+  }
+  else if(boss.st==='parry'){
+    const pa=Math.atan2(you.y-boss.y,you.x-boss.x);
+    boss.x+=Math.cos(pa)*13; boss.y+=Math.sin(pa)*13;
+    if(dist(you,boss)<you.r+boss.r+4) hurtYou(16);
+    const pd=Math.hypot(boss.x-CX,boss.y-CY);
+    if(pd>ARENA-boss.r){const b=Math.atan2(boss.y-CY,boss.x-CX);
+      boss.x=CX+Math.cos(b)*(ARENA-boss.r); boss.y=CY+Math.sin(b)*(ARENA-boss.r);}
+    if(boss.t>=boss.dur){ boss.st='idle'; boss.t=0; boss.dur=rand(28,52)-14*R.depth; }
+  }
+
+  // projectiles
+  for(const s of shots){
+    s.x+=s.vx; s.y+=s.vy; s.life--;
+    if(dist(you,s)<you.r+s.r) {hurtYou(11); s.life=0;}
+    if(Math.hypot(s.x-CX,s.y-CY)>ARENA) s.life=0;
+  }
+  shots=shots.filter(s=>s.life>0);
+}
+
+/* =========================================================
+   DRAW
+   ========================================================= */
+function draw(){
+  ctx.save();
+  if(shake>0){ ctx.translate(rand(-shake,shake),rand(-shake,shake)); shake*=0.86; if(shake<.4)shake=0; }
+  ctx.clearRect(-40,-40,W+80,H+80);
+  ctx.fillStyle='#181330'; ctx.fillRect(-40,-40,W+80,H+80);
+
+  // arena
+  ctx.strokeStyle='#2A2246'; ctx.lineWidth=1;
+  for(let i=1;i<=4;i++){ctx.beginPath();ctx.arc(CX,CY,ARENA*i/4,0,TAU);ctx.stroke();}
+  for(let i=0;i<12;i++){const a=i/12*TAU;
+    ctx.beginPath();ctx.moveTo(CX+Math.cos(a)*40,CY+Math.sin(a)*40);
+    ctx.lineTo(CX+Math.cos(a)*ARENA,CY+Math.sin(a)*ARENA);ctx.stroke();}
+  ctx.strokeStyle='#3B3163'; ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(CX,CY,ARENA,0,TAU);ctx.stroke();
+
+  // particles
+  for(const b of bits){ b.x+=b.vx;b.y+=b.vy;b.vx*=.92;b.vy*=.92;b.life--;
+    ctx.fillStyle=`rgba(${b.col},${b.life/28})`; ctx.fillRect(b.x-2,b.y-2,4,4); }
+  bits=bits.filter(b=>b.life>0);
+
+  drawTelegraph();
+
+  // projectiles
+  for(const s of shots){
+    ctx.fillStyle='#FF5A47'; ctx.shadowColor='#FF5A47'; ctx.shadowBlur=14;
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,TAU);ctx.fill(); ctx.shadowBlur=0;
+  }
+
+  drawBoss();
+  drawYou();
+  ctx.restore();
+  drawCallout();
+}
+
+function drawCallout(){
+  if(!callout)return;
+  const a = callout.life>55 ? (70-callout.life)/15 : Math.min(1,callout.life/50);
+  ctx.save();
+  ctx.globalAlpha=clamp(a,0,1);
+  ctx.fillStyle='#FFC34D'; ctx.textAlign='center';
+  ctx.font="700 16px 'Chakra Petch',sans-serif";
+  ctx.shadowColor='#FFC34D'; ctx.shadowBlur=10;
+  ctx.fillText(callout.text, CX, 128);
+  ctx.restore();
+}
+
+function drawTelegraph(){
+  if(boss.st!=='wind')return;
+  const p=boss.t/boss.dur;
+  // feints flicker twice so a trained eye can still catch them
+  const on = boss.feint ? (p<0.42 || p>0.72) : true;
+  const a = on ? (0.16+0.42*p) : 0.05;
+  ctx.save(); ctx.globalAlpha=a; ctx.fillStyle='#FFC34D';
+  if(boss.atk==='sweep'){
+    ctx.beginPath();ctx.moveTo(boss.x,boss.y);
+    ctx.arc(boss.x,boss.y,boss.r+95,boss.aim-1.05,boss.aim+1.05);ctx.closePath();ctx.fill();
+  }else if(boss.atk==='lunge'){
+    ctx.save();ctx.translate(boss.x,boss.y);ctx.rotate(boss.aim);
+    ctx.fillRect(0,-boss.r,430,boss.r*2);ctx.restore();
+  }else if(boss.atk==='slam'){
+    ctx.beginPath();ctx.arc(boss.tx,boss.ty,78,0,TAU);ctx.fill();
+    ctx.globalAlpha=Math.min(1,a+.3);ctx.strokeStyle='#FFC34D';ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(boss.tx,boss.ty,78*p,0,TAU);ctx.stroke();
+  }else{
+    ctx.save();ctx.translate(boss.x,boss.y);ctx.rotate(boss.aim);
+    ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,400,-0.5,0.5);ctx.closePath();ctx.fill();ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawBoss(){
+  const pulse=1+Math.sin(boss.pulse)*0.04;
+  ctx.save(); ctx.translate(boss.x,boss.y);
+  ctx.shadowColor='#FF5A47'; ctx.shadowBlur=boss.st==='rest'?6:(boss.st==='parry'?30:26);
+  ctx.fillStyle = boss.hurt>0?'#FFF':(boss.st==='parry'?'#FFC34D':(boss.st==='rest'?'#8E3A34':'#FF5A47'));
+  ctx.beginPath();
+  for(let i=0;i<6;i++){const a=i/6*TAU+boss.pulse*0.2;
+    const r=boss.r*pulse*(i%2?0.86:1.12);
+    i?ctx.lineTo(Math.cos(a)*r,Math.sin(a)*r):ctx.moveTo(Math.cos(a)*r,Math.sin(a)*r);}
+  ctx.closePath();ctx.fill(); ctx.shadowBlur=0;
+  // eye tracks you — it is always looking
+  const a=Math.atan2(you.y-boss.y,you.x-boss.x);
+  ctx.fillStyle='#100D1B';ctx.beginPath();ctx.arc(Math.cos(a)*9,Math.sin(a)*9,7,0,TAU);ctx.fill();
+  ctx.fillStyle=boss.st==='wind'?'#FFC34D':'#FFF';
+  ctx.beginPath();ctx.arc(Math.cos(a)*11,Math.sin(a)*11,3,0,TAU);ctx.fill();
+  ctx.restore();
+}
+
+function drawYou(){
+  ctx.save(); ctx.translate(you.x,you.y);
+  if(you.rolling>0){ctx.globalAlpha=.55;}
+  ctx.shadowColor='#7BE8E0';ctx.shadowBlur=you.inv>0?20:10;
+  ctx.fillStyle=you.hurt>18?'#FFF':'#7BE8E0';
+  ctx.beginPath();ctx.arc(0,0,you.r,0,TAU);ctx.fill();ctx.shadowBlur=0;
+  ctx.rotate(you.face);
+  ctx.fillStyle='#100D1B';ctx.fillRect(you.r-4,-2.5,7,5);
+  if(you.swingT>0){
+    const p=1-you.swingT/7;
+    ctx.globalAlpha=.85-p*.6; ctx.strokeStyle='#EDE9F5'; ctx.lineWidth=5;
+    ctx.beginPath();ctx.arc(0,0,42,-0.9+p*1.8-0.45,-0.9+p*1.8+0.45);ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/* =========================================================
+   LOOP
+   ========================================================= */
+function tick(){
+  requestAnimationFrame(tick);
+  if(callout){ callout.life--; if(callout.life<=0) callout=null; }
+  if(state==='play'){
+    if(freeze>0){freeze--;}
+    else{ stepPlayer(); stepBoss(); }
+    $('hpYou').firstElementChild.style.width=Math.max(0,you.hp)+'%';
+    $('hpBoss').firstElementChild.style.width=Math.max(0,boss.hp/boss.max*100)+'%';
+    $('youNum').textContent=Math.max(0,Math.round(you.hp));
+    $('bossNum').textContent=Math.max(0,Math.round(boss.hp));
+  }
+  draw();
+}
+
+/* =========================================================
+   RUN START / END
+   ========================================================= */
+function paintRunTag(){
+  const R=read();
+  $('runTag').innerHTML = mem.runs
+    ? `RUN ${String(mem.runs+1).padStart(2,'0')} · IT HAS <b>${mem.runs}</b> RUN${mem.runs>1?'S':''} ON YOU`
+    : `RUN 01 · ITS FILE ON YOU IS EMPTY`;
+  updateMasteryNote();
+}
+function updateMasteryNote(){
+  const el=$('masteryNote');
+  if(mem.runs>=3){
+    el.style.display='block';
+    el.textContent='It has been open long enough to start punishing you back — swing into its recovery too often and it may parry.';
+  }else{
+    el.style.display='none';
+  }
+}
+function start(){
+  reset(); state='play'; paintRunTag();
+  $('scStart').classList.add('hide'); $('scEnd').classList.add('hide');
+}
+function end(won){
+  state='over';
+  mem.runs++; if(won)mem.kills++;
+  if(runRangeN){ mem.rangeSum+=runRange; mem.rangeN+=runRangeN; }
+  mem.bestHp=Math.max(mem.bestHp,won?you.hp:0);
+  saveMem(); paintRunTag();
+
+  const R=read(), notes=[];
+  if(R.fav!=='none'){
+    const word={away:'away from it',into:'straight at it',left:'to its left',right:'to its right'}[R.fav];
+    notes.push(`You roll <b>${word}</b> ${Math.round(R.favP*100)}% of the time. It will aim there.`);
+  }
+  if(R.avgRange) notes.push(`You fight at <b>${Math.round(R.avgRange)}px</b>. ${R.avgRange>200?'It will close the gap harder.':'It will drop more slams on your feet.'}`);
+  if(R.timing>0.6) notes.push(`You bail <b>${Math.round(R.timing*100)}%</b> of rolls before the swing commits. Expect it to hold the blow.`);
+  else if(R.timing&&R.timing<0.4) notes.push(`You roll <b>late</b>. It will speed up the wind-up.`);
+  if(R.greed>0.3) notes.push(`<b>${Math.round(R.greed*100)}%</b> of your swings land in its recovery. It will shorten that window.`);
+  if(parriesThisRun>0) notes.push(`It parried you <b>${parriesThisRun}</b> time${parriesThisRun>1?'s':''} this run for swinging into its recovery.`);
+  if(!notes.length) notes.push(`Not enough on you yet. Keep dying and it fills in.`);
+
+  $('endKick').textContent = won?'THE FILE STAYS OPEN':'IT ADDS A PAGE';
+  $('endTitle').innerHTML  = won?'YOU <span>WON</span>':'IT <span>HAD YOU</span>';
+  $('endLearned').innerHTML= notes.map(n=>`<div>${n}</div>`).join('');
+  $('scEnd').classList.remove('hide');
+}
+
+let prevState='menu';
+function openFile(){
+  if(state==='file')return;
+  prevState=state; state='file';
+  renderFile();
+  $('scFile').classList.remove('hide');
+}
+function closeFile(){
+  state=prevState;
+  $('scFile').classList.add('hide');
+}
+function renderFile(){
+  $('fileRuns').textContent=mem.runs;
+  const R=read(), rows=[];
+  const tot=mem.roll.away+mem.roll.into+mem.roll.left+mem.roll.right;
+  if(tot>=4){
+    const dirs=[['away','ROLLS AWAY FROM IT'],['into','ROLLS STRAIGHT AT IT'],
+                ['left','ROLLS TO ITS LEFT'],['right','ROLLS TO ITS RIGHT']];
+    for(const [k,label] of dirs){
+      const pct=Math.round(mem.roll[k]/tot*100);
+      rows.push(`<div class="frow"><div class="flabel"><span>${label}</span><b>${pct}%</b></div><div class="ftrack"><i style="width:${pct}%"></i></div></div>`);
+    }
+  }
+  if(mem.rangeN>20){
+    const avg=Math.round(mem.rangeSum/mem.rangeN);
+    rows.push(`<div class="frow"><div class="flabel"><span>PREFERRED RANGE</span><b>${avg}px — ${avg>200?'LONG':avg>140?'MID':'CLOSE'}</b></div></div>`);
+  }
+  const tt=mem.early+mem.late;
+  if(tt>=4){
+    const pct=Math.round(mem.early/tt*100);
+    rows.push(`<div class="frow"><div class="flabel"><span>ROLLS EARLY, BEFORE THE SWING COMMITS</span><b>${pct}%</b></div><div class="ftrack"><i style="width:${pct}%"></i></div></div>`);
+  }
+  if(mem.swings>=8){
+    const pct=Math.round(mem.greedy/mem.swings*100);
+    rows.push(`<div class="frow"><div class="flabel"><span>SWINGS INTO ITS RECOVERY</span><b>${pct}%</b></div><div class="ftrack"><i style="width:${pct}%"></i></div></div>`);
+  }
+  rows.push(`<div class="frow"><div class="flabel"><span>HOW MUCH IT TRUSTS THIS FILE</span><b>${Math.round(R.depth*100)}%</b></div><div class="ftrack"><i style="width:${Math.round(R.depth*100)}%;background:var(--warn)"></i></div></div>`);
+  $('fileBody').innerHTML = rows.length ? rows.join('') : '<p class="fempty">Nothing on record yet. Die a few times.</p>';
+}
+
+$('btnStart').addEventListener('click',start);
+$('btnAgain').addEventListener('click',start);
+$('btnFile').addEventListener('click',openFile);
+$('btnFileClose').addEventListener('click',closeFile);
+$('btnWipe').addEventListener('click',async()=>{
+  mem=blank(); try{await window.storage.delete(KEY);}catch(e){}
+  paintRunTag(); $('btnWipe').textContent='ERASED — IT KNOWS NOTHING';
+});
+
+reset(); loadMem(); tick();
+</script>
+</body>
+</html>

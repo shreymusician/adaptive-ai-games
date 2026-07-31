@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>THE FIVE — they remember how you fight</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#100D1B;
+  --floor:#181330;
+  --line:#2A2246;
+  --player:#E14F6B;
+  --warn:#FFC34D;
+  --bone:#EDE9F5;
+  --dim:#8279A6;
+  --tank:#7FB2D9;
+  --mage:#FF7A45;
+  --tk:#B27FE0;
+  --heal:#6FD98F;
+  --asn:#F2F0E8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--void);color:var(--bone);
+  font-family:"Chakra Petch",system-ui,sans-serif;user-select:none;touch-action:none}
+#wrap{position:relative;width:100vw;height:100dvh;display:grid;place-items:center}
+#stage{position:relative;width:min(96vw,96dvh,760px);aspect-ratio:1}
+canvas{width:100%;height:100%;display:block;background:var(--floor);
+  border:1px solid var(--line);border-radius:2px;box-shadow:0 0 60px rgba(225,79,107,.10),inset 0 0 90px rgba(0,0,0,.55)}
+
+/* ---------- HUD ---------- */
+#hud{position:absolute;inset:8px 10px auto 10px;pointer-events:none;font-family:"IBM Plex Mono",monospace}
+.bar{height:8px;background:rgba(0,0,0,.45);border:1px solid var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--player);box-shadow:0 0 10px var(--player);transition:width .12s linear}
+.lbl{display:flex;justify-content:space-between;font-size:9.5px;letter-spacing:.18em;color:var(--dim);margin-bottom:3px}
+#bossWrap{margin-bottom:7px}
+#bossWrap.raging .lbl{color:var(--warn)}
+#heroRow{display:flex;gap:5px;margin-bottom:6px}
+.hbar{flex:1;height:7px;background:rgba(0,0,0,.45);border:1px solid var(--line);overflow:hidden;transition:opacity .2s}
+.hbar i{display:block;height:100%;transition:width .15s linear}
+#dirTag{font-size:9.5px;letter-spacing:.18em;color:var(--dim)}
+#dirTag b{color:var(--warn);font-weight:600}
+#runTag{position:absolute;top:8px;left:50%;transform:translateX(-50%);font-family:"IBM Plex Mono",monospace;
+  font-size:9.5px;letter-spacing:.2em;color:var(--dim);pointer-events:none;text-align:center;line-height:1.6}
+#runTag b{color:var(--warn);font-weight:600}
+
+/* ---------- overlays ---------- */
+.screen{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;
+  background:rgba(16,13,27,.93);backdrop-filter:blur(3px);z-index:5}
+.screen.hide{display:none}
+.screen h1{font-size:clamp(28px,6.6vw,54px);margin:0;letter-spacing:.04em;line-height:1;font-weight:700}
+.screen h1 span{color:var(--player)}
+.kick{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.22em;color:var(--dim);margin-bottom:10px}
+.screen p{max-width:46ch;margin:14px auto 0;font-size:14px;line-height:1.6;color:#C4BDDD}
+.mastery{color:var(--warn)!important}
+.learned{margin:18px auto 0;max-width:48ch;text-align:left;font-family:"IBM Plex Mono",monospace;font-size:11.5px;line-height:1.55}
+.learned div{border-left:2px solid var(--player);padding:6px 0 6px 11px;margin-bottom:7px;color:#C4BDDD}
+.learned b{color:var(--warn);font-weight:600}
+.keys{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--dim);margin-top:18px;line-height:2}
+.keys kbd{background:var(--line);border:1px solid #3b3163;border-radius:3px;padding:2px 7px;color:var(--bone);font-size:10.5px}
+button.go{margin-top:22px;font-family:"Chakra Petch";font-weight:700;font-size:15px;letter-spacing:.12em;
+  background:var(--player);color:#1A0B10;border:0;padding:13px 34px;cursor:pointer;border-radius:2px}
+button.go:hover{filter:brightness(1.12)}
+button.go:focus-visible{outline:2px solid var(--warn);outline-offset:3px}
+.wipe{margin-top:12px;background:none;border:1px solid var(--line);color:var(--dim);
+  font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.16em;padding:8px 16px;cursor:pointer;border-radius:2px}
+.wipe:hover{color:var(--player);border-color:var(--player)}
+
+.filebody{width:min(86vw,440px);text-align:left;margin:14px auto 0;font-family:"IBM Plex Mono",monospace;font-size:11.5px}
+.frow{margin-bottom:13px}
+.frow .flabel{display:flex;justify-content:space-between;gap:10px;color:var(--dim);letter-spacing:.05em;margin-bottom:4px}
+.frow .flabel b{color:var(--bone);font-weight:600}
+.ftrack{height:7px;background:rgba(0,0,0,.4);border:1px solid var(--line)}
+.ftrack i{display:block;height:100%;background:var(--player)}
+.fempty{color:var(--dim);font-style:italic;font-size:12.5px;text-align:center}
+
+/* ---------- touch ---------- */
+#touch{position:absolute;inset:0;z-index:3;display:none}
+.tbtn{position:absolute;bottom:16px;width:66px;height:66px;border-radius:50%;
+  border:1px solid var(--line);background:rgba(40,32,70,.5);display:grid;place-items:center;
+  font-family:"IBM Plex Mono",monospace;font-size:9px;letter-spacing:.1em;color:var(--bone)}
+#bSlam{right:14px;border-color:var(--player)}
+#bWave{right:92px;border-color:var(--player)}
+#bBeam{right:170px;border-color:var(--player)}
+#bFile{left:14px;top:76px;bottom:auto;width:50px;height:50px;font-size:8px;border-color:var(--warn);color:var(--warn)}
+.tbtn:active{background:rgba(225,79,107,.28)}
+#stickBase{position:absolute;width:104px;height:104px;border-radius:50%;border:1px solid var(--line);
+  opacity:0;pointer-events:none}
+#stickNub{position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(225,79,107,.30);
+  border:1px solid var(--player);opacity:0;pointer-events:none}
+body.touch #touch{display:block}
+@media (prefers-reduced-motion:reduce){.bar i,.hbar i{transition:none}}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="cv" width="760" height="760"></canvas>
+
+  <div id="hud">
+    <div id="bossWrap">
+      <div class="lbl"><span>YOU — THE BOSS</span><span id="bossNum">1000</span></div>
+      <div class="bar" id="hpBoss"><i style="width:100%"></i></div>
+    </div>
+    <div id="heroRow">
+      <div class="hbar" data-role="tank"><i></i></div>
+      <div class="hbar" data-role="mage"><i></i></div>
+      <div class="hbar" data-role="tk"><i></i></div>
+      <div class="hbar" data-role="healer"><i></i></div>
+      <div class="hbar" data-role="asn"><i></i></div>
+    </div>
+    <div id="dirTag">SQUAD: <b id="dirVal">PRESSURE</b></div>
+  </div>
+  <div id="runTag"></div>
+
+  <div id="touch">
+    <div id="stickBase"></div><div id="stickNub"></div>
+    <div class="tbtn" id="bBeam">BEAM</div>
+    <div class="tbtn" id="bWave">WAVE</div>
+    <div class="tbtn" id="bSlam">SLAM</div>
+    <div class="tbtn" id="bFile">FILE</div>
+  </div>
+
+  <!-- start -->
+  <div class="screen" id="scStart">
+    <div>
+      <div class="kick">FIVE AGAINST ONE · THEY'VE BEEN WAITING TOO</div>
+      <h1>THE <span>FIVE</span></h1>
+      <p>You are the boss. They don't get stronger when you win. They get smarter about exactly how you hit — who you go for, what you open with, how far you'll chase.</p>
+      <p class="mastery" id="masteryNote" style="display:none"></p>
+      <div class="keys" id="keyHelp"></div>
+      <button class="go" id="btnStart">BEGIN THE SIEGE</button><br>
+      <button class="wipe" id="btnFile">VIEW THE FILE</button>
+      <button class="wipe" id="btnWipe">ERASE WHAT THEY KNOW</button>
+    </div>
+  </div>
+
+  <!-- end -->
+  <div class="screen hide" id="scEnd">
+    <div>
+      <div class="kick" id="endKick"></div>
+      <h1 id="endTitle"></h1>
+      <div class="learned" id="endLearned"></div>
+      <button class="go" id="btnAgain">GO AGAIN</button>
+    </div>
+  </div>
+
+  <!-- file dossier -->
+  <div class="screen hide" id="scFile">
+    <div>
+      <div class="kick">SQUAD FILE · <span id="fileMatches">0</span> MATCHES ON RECORD</div>
+      <h1 style="font-size:clamp(24px,5.5vw,38px)">WHAT THE SQUAD <span>KNOWS</span></h1>
+      <div class="filebody" id="fileBody"></div>
+      <button class="go" id="btnFileClose">CLOSE</button>
+    </div>
+  </div>
+</div></div>
+
+<script>
+/* =========================================================
+   SETUP
+   ========================================================= */
+const cv=document.getElementById('cv'), ctx=cv.getContext('2d');
+const W=760,H=760, CX=W/2, CY=H/2, ARENA=340;
+const TAU=Math.PI*2;
+const $=id=>document.getElementById(id);
+const rand=(a,b)=>a+Math.random()*(b-a);
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+function angDiff(a,b){let d=(a-b)%TAU; if(d>Math.PI)d-=TAU; if(d<-Math.PI)d+=TAU; return d;}
+function hexToRgb(hex){const n=parseInt(hex.slice(1),16); return `${(n>>16)&255},${(n>>8)&255},${n&255}`;}
+
+if(matchMedia('(pointer:coarse)').matches) document.body.classList.add('touch');
+const isTouch=document.body.classList.contains('touch');
+$('keyHelp').innerHTML = isTouch
+  ? 'Drag the left side to move<br>Tap <kbd>SLAM</kbd> · <kbd>WAVE</kbd> · <kbd>BEAM</kbd><br>Tap <kbd>FILE</kbd> to see what they know'
+  : '<kbd>WASD</kbd> / <kbd>↑←↓→</kbd> move · aim with mouse<br><kbd>J</kbd> Slam · <kbd>K</kbd> Shockwave · <kbd>Space</kbd> Beam<br><kbd>Tab</kbd> view the squad\'s file on you';
+
+/* =========================================================
+   ROLES
+   ========================================================= */
+const ROLES=['tank','mage','tk','healer','asn'];
+const ROLE_INFO={
+  tank:  {label:'TANK',        color:'#7FB2D9', hp:150, speed:2.05, range:50,  cd:32, dmg:9,  prefDist:60},
+  mage:  {label:'FIRE MAGE',   color:'#FF7A45', hp:80,  speed:2.35, range:200, cd:55, dmg:16, prefDist:200},
+  tk:    {label:'TELEKINETIC', color:'#B27FE0', hp:85,  speed:2.35, range:190, cd:70, dmg:9,  prefDist:180},
+  healer:{label:'HEALER',      color:'#6FD98F', hp:85,  speed:2.4,  range:210, cd:1,  dmg:0,  prefDist:230},
+  asn:   {label:'ASSASSIN',    color:'#F2F0E8', hp:75,  speed:2.9,  range:44,  cd:26, dmg:17, prefDist:70},
+};
+
+/* =========================================================
+   MEMORY — survives death and page reload
+   ========================================================= */
+const KEY='titan-squad-memory-v1';
+const blank=()=>({
+  matches:0, squadWins:0, squadLosses:0,
+  hits:{tank:0,mage:0,tk:0,healer:0,asn:0},     // damage instances landed per hero role
+  abilityUse:{slam:0,shockwave:0,beam:0},        // which button you like to press
+  aggroSum:0, aggroN:0,                          // distance from center when you commit to an attack
+  beamInterrupted:0                              // how often the Telekinetic stopped your Beam
+});
+let mem=blank(), canSave=false;
+
+async function loadMem(){
+  try{ const r=await window.storage.get(KEY); if(r&&r.value) mem=Object.assign(blank(),JSON.parse(r.value)); canSave=true; }
+  catch(e){ canSave = typeof window.storage!=='undefined'; }
+  paintRunTag();
+}
+async function saveMem(){ if(!canSave)return; try{ await window.storage.set(KEY,JSON.stringify(mem)); }catch(e){} }
+
+function read(){
+  const totalHits=ROLES.reduce((s,r)=>s+mem.hits[r],0);
+  let favTarget='none',favP=0;
+  if(totalHits>=6){ for(const r of ROLES){ if(mem.hits[r]/totalHits>favP){favP=mem.hits[r]/totalHits;favTarget=r;} } }
+  const abl=mem.abilityUse, totalAbl=abl.slam+abl.shockwave+abl.beam;
+  let favAbility='none',favAbilityP=0;
+  if(totalAbl>=6){ for(const a of ['slam','shockwave','beam']){ if(abl[a]/totalAbl>favAbilityP){favAbilityP=abl[a]/totalAbl;favAbility=a;} } }
+  const aggression = mem.aggroN>10 ? mem.aggroSum/mem.aggroN : 0;
+  const interruptRate = abl.beam>=4 ? mem.beamInterrupted/abl.beam : 0;
+  const depth = 1-Math.exp(-mem.matches/2.4);
+  return {favTarget,favP,favAbility,favAbilityP,aggression,interruptRate,depth,totalHits};
+}
+
+/* =========================================================
+   INPUT
+   ========================================================= */
+const keys={}, mouse={x:CX,y:CY-100};
+addEventListener('keydown',e=>{
+  if(['Space','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Tab'].includes(e.code))e.preventDefault();
+  if(e.code==='Tab'||e.code==='KeyF'){
+    if(state==='file') closeFile(); else if(state==='play'||state==='menu') openFile();
+    return;
+  }
+  if(e.code==='KeyJ') tryAbility('slam');
+  if(e.code==='KeyK') tryAbility('shockwave');
+  if(e.code==='Space'||e.code==='KeyL') tryAbility('beam');
+  keys[e.code]=true;
+});
+addEventListener('keyup',e=>keys[e.code]=false);
+cv.addEventListener('mousemove',e=>{const r=cv.getBoundingClientRect();
+  mouse.x=(e.clientX-r.left)/r.width*W; mouse.y=(e.clientY-r.top)/r.height*H;});
+cv.addEventListener('mousedown',()=>{if(state==='play')tryAbility('slam');});
+
+let stick={active:false,id:null,dx:0,dy:0};
+const base=$('stickBase'),nub=$('stickNub');
+function stickStart(t){
+  const r=$('stage').getBoundingClientRect();
+  stick.active=true; stick.id=t.identifier; stick.ox=t.clientX-r.left; stick.oy=t.clientY-r.top;
+  base.style.cssText=`left:${stick.ox-52}px;top:${stick.oy-52}px;opacity:.7`;
+  nub.style.cssText=`left:${stick.ox-22}px;top:${stick.oy-22}px;opacity:1`;
+}
+function stickMove(t){
+  const r=$('stage').getBoundingClientRect();
+  let dx=(t.clientX-r.left)-stick.ox, dy=(t.clientY-r.top)-stick.oy;
+  const m=Math.hypot(dx,dy)||1, cl=Math.min(m,46);
+  stick.dx=dx/m*(cl/46); stick.dy=dy/m*(cl/46);
+  nub.style.left=(stick.ox+dx/m*cl-22)+'px'; nub.style.top=(stick.oy+dy/m*cl-22)+'px';
+}
+function stickEnd(){stick.active=false;stick.dx=stick.dy=0;base.style.opacity=0;nub.style.opacity=0;}
+$('touch').addEventListener('touchstart',e=>{
+  for(const t of e.changedTouches){
+    const r=$('stage').getBoundingClientRect();
+    if(t.clientX-r.left < r.width*0.55 && !stick.active) stickStart(t);
+  }
+},{passive:true});
+$('touch').addEventListener('touchmove',e=>{
+  for(const t of e.changedTouches) if(t.identifier===stick.id) stickMove(t);
+},{passive:true});
+$('touch').addEventListener('touchend',e=>{
+  for(const t of e.changedTouches) if(t.identifier===stick.id) stickEnd();
+},{passive:true});
+$('bSlam').addEventListener('touchstart',e=>{e.preventDefault();tryAbility('slam');});
+$('bWave').addEventListener('touchstart',e=>{e.preventDefault();tryAbility('shockwave');});
+$('bBeam').addEventListener('touchstart',e=>{e.preventDefault();tryAbility('beam');});
+$('bFile').addEventListener('touchstart',e=>{e.preventDefault();e.stopPropagation();
+  if(state==='file')closeFile(); else openFile();});
+function inputX(){ return (keys.KeyD||keys.ArrowRight?1:0)-(keys.KeyA||keys.ArrowLeft?1:0)+stick.dx; }
+function inputY(){ return (keys.KeyS||keys.ArrowDown?1:0)-(keys.KeyW||keys.ArrowUp?1:0)+stick.dy; }
+
+/* =========================================================
+   AUDIO — tiny, no assets
+   ========================================================= */
+let AC=null;
+function blip(f,d,type,vol){
+  try{ AC=AC||new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(),g=AC.createGain();
+    o.type=type||'square'; o.frequency.value=f;
+    g.gain.setValueAtTime(vol||.06,AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);
+    o.connect(g).connect(AC.destination); o.start(); o.stop(AC.currentTime+d);
+  }catch(e){}
+}
+
+let callout=null;
+function say(text){ callout={text,life:70}; }
+
+/* =========================================================
+   ENTITIES
+   ========================================================= */
+let boss, heroes, shots, bits, shake, freeze, state='menu';
+let directive='PRESSURE', dirTimer=0, matchInterrupts=0, matchInterruptedThisCast=false;
+let matchPincerCalled=false, matchPincers=0;
+
+function reset(){
+  boss={
+    x:CX,y:CY,r:26,hp:1000,maxHp:1000,face:-Math.PI/2,hurt:0,rage:false,
+    cd:{slam:0,shockwave:0,beam:0},
+    st:'idle',t:0,dur:0,ability:null,aim:0
+  };
+  heroes=ROLES.map((r,i)=>{
+    const a=(i/ROLES.length)*TAU;
+    return {
+      role:r, x:CX+Math.cos(a)*220, y:CY+Math.sin(a)*220,
+      hp:ROLE_INFO[r].hp, maxHp:ROLE_INFO[r].hp,
+      cd:0, healCd:0, hurt:0, down:false, tx:CX, ty:CY
+    };
+  });
+  shots=[]; bits=[]; shake=0; freeze=0; callout=null;
+  directive='PRESSURE'; dirTimer=0;
+  matchInterrupts=0; matchInterruptedThisCast=false;
+  matchPincerCalled=false; matchPincers=0;
+}
+
+function spark(x,y,n,col,spd){
+  for(let i=0;i<n;i++){const a=rand(0,TAU),s=rand(1,spd||4);
+    bits.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:rand(14,30),col});}
+}
+
+/* =========================================================
+   BOSS — the player
+   ========================================================= */
+function tryAbility(name){
+  if(state!=='play'||boss.st!=='idle')return;
+  if(name==='slam' && boss.cd.slam<=0){
+    boss.st='slamWind'; boss.t=0; boss.dur=9; boss.ability='slam'; boss.aim=boss.face;
+    recordCast('slam');
+  }else if(name==='shockwave' && boss.cd.shockwave<=0){
+    boss.st='waveWind'; boss.t=0; boss.dur=20; boss.ability='shockwave';
+    recordCast('shockwave');
+  }else if(name==='beam' && boss.cd.beam<=0){
+    boss.st='beamWind'; boss.t=0; boss.dur=44; boss.ability='beam'; boss.aim=boss.face;
+    recordCast('beam'); matchInterruptedThisCast=false;
+    updateDirective(); dirTimer=34;
+  }
+}
+function recordCast(name){
+  mem.abilityUse[name]++;
+  mem.aggroSum+=dist(boss,{x:CX,y:CY}); mem.aggroN++;
+}
+function resolveSlam(){
+  boss.atkT=12;
+  boss.cd.slam=Math.round(26*(boss.rage?0.7:1));
+  for(const h of heroes){ if(h.down)continue;
+    const d=dist(h,boss);
+    if(d<boss.r+70 && Math.abs(angDiff(Math.atan2(h.y-boss.y,h.x-boss.x),boss.aim))<0.95) hurtHero(h,58,'slam');
+  }
+  shake=Math.max(shake,8); freeze=Math.max(freeze,3); blip(150,.09,'sawtooth',.06);
+}
+function resolveWave(){
+  boss.atkT=12;
+  boss.cd.shockwave=Math.round(105*(boss.rage?0.7:1));
+  for(const h of heroes){ if(h.down)continue;
+    const d=dist(h,boss);
+    if(d<155){
+      hurtHero(h,42,'shockwave');
+      const a=Math.atan2(h.y-boss.y,h.x-boss.x);
+      h.x+=Math.cos(a)*46; h.y+=Math.sin(a)*46;
+    }
+  }
+  shake=Math.max(shake,12); freeze=Math.max(freeze,3); blip(80,.16,'sawtooth',.08);
+}
+function resolveBeam(){
+  boss.atkT=12;
+  boss.cd.beam=Math.round(165*(boss.rage?0.7:1));
+  const interrupted=matchInterruptedThisCast;
+  for(const h of heroes){ if(h.down)continue;
+    const d=dist(h,boss);
+    if(d<430 && Math.abs(angDiff(Math.atan2(h.y-boss.y,h.x-boss.x),boss.aim))<0.30){
+      hurtHero(h, interrupted?30:88, 'beam');
+    }
+  }
+  shake=Math.max(shake,interrupted?8:16); freeze=Math.max(freeze,3);
+  blip(interrupted?260:70,.2,'sawtooth',.09);
+}
+function stepBoss(){
+  let dx=inputX(),dy=inputY(); const m=Math.hypot(dx,dy);
+  if(m>0.15){ dx/=m;dy/=m; const sp=boss.rage?2.9:2.55; boss.x+=dx*sp; boss.y+=dy*sp; if(isTouch) boss.face=Math.atan2(dy,dx); }
+  if(!isTouch) boss.face=Math.atan2(mouse.y-boss.y,mouse.x-boss.x);
+  const d=Math.hypot(boss.x-CX,boss.y-CY);
+  if(d>ARENA-boss.r){const a=Math.atan2(boss.y-CY,boss.x-CX); boss.x=CX+Math.cos(a)*(ARENA-boss.r); boss.y=CY+Math.sin(a)*(ARENA-boss.r);}
+
+  boss.cd.slam=Math.max(0,boss.cd.slam-1);
+  boss.cd.shockwave=Math.max(0,boss.cd.shockwave-1);
+  boss.cd.beam=Math.max(0,boss.cd.beam-1);
+  boss.hurt=Math.max(0,boss.hurt-1);
+  boss.atkT=Math.max(0,(boss.atkT||0)-1);
+  boss.rage = boss.hp>0 && boss.hp/boss.maxHp<0.25;
+
+  if(boss.st==='slamWind'||boss.st==='waveWind'||boss.st==='beamWind'){
+    boss.t++;
+    if(boss.t>=boss.dur){
+      if(boss.st==='slamWind') resolveSlam();
+      else if(boss.st==='waveWind') resolveWave();
+      else resolveBeam();
+      boss.st='idle'; boss.ability=null;
+    }
+  }
+}
+function hurtBoss(dmg){
+  if(boss.hp<=0 || state!=='play') return;
+  boss.hp-=dmg; boss.hurt=8; shake=Math.max(shake,4); freeze=Math.max(freeze,1);
+  spark(boss.x,boss.y,6,hexToRgb('#E14F6B'),3);
+  if(boss.hp<=0){ boss.hp=0; end(false); }
+}
+function hurtHero(h,dmg,ability){
+  if(h.down)return;
+  h.hp-=dmg; h.hurt=18;
+  mem.hits[h.role]++;
+  spark(h.x,h.y,10,hexToRgb(ROLE_INFO[h.role].color),4);
+  if(h.hp<=0){
+    h.hp=0; h.down=true; say(`${ROLE_INFO[h.role].label} IS DOWN`);
+    if(heroes.every(x=>x.down)) end(true);
+  }
+}
+
+/* =========================================================
+   TELEKINETIC INTERRUPT
+   ========================================================= */
+function tkAttemptInterrupt(h){
+  if(boss.st==='beamWind' && !matchInterruptedThisCast && h.cd<=0 && dist(h,boss)<210){
+    matchInterruptedThisCast=true;
+    mem.beamInterrupted++; matchInterrupts++;
+    h.cd=ROLE_INFO.tk.cd;
+    shake=Math.max(shake,10); spark(boss.x,boss.y,14,hexToRgb('#B27FE0'),5); blip(500,.12,'triangle',.06);
+    say('BEAM INTERRUPTED');
+  }
+}
+
+/* =========================================================
+   COMMANDER AI — invisible, sets one shared directive
+   ========================================================= */
+function updateDirective(){
+  const R=read();
+  const alive=heroes.filter(h=>!h.down);
+  if(!alive.length)return;
+  const lowestFrac=Math.min(...alive.map(h=>h.hp/h.maxHp));
+  let next='PRESSURE';
+  if(boss.st==='beamWind') next='INTERRUPT';
+  else if(lowestFrac<0.3) next='REGROUP';
+  else if(R.favTarget==='healer' && R.favP>0.4 && R.depth>0.25) next='PROTECT_HEALER';
+  else if(boss.hp/boss.maxHp<0.35) next='FOCUS';
+
+  if(next!==directive){
+    if(next==='PROTECT_HEALER' && R.depth>0.3) say("THE TANK KNOWS WHERE YOU'RE HEADED");
+    else if(next==='REGROUP') say("THEY'RE FALLING BACK");
+    else if(next==='INTERRUPT'){
+      const pincerReady = R.depth>0.35 && mem.matches>=3;
+      if(pincerReady){
+        matchPincers++;
+        if(!matchPincerCalled){ matchPincerCalled=true; say("THEY'RE COMMITTING — PINCER"); }
+      }else if(R.depth>0.2){
+        say('WATCH THE TELEKINETIC');
+      }
+    }
+  }
+  directive=next;
+}
+
+/* =========================================================
+   HERO BEHAVIOR
+   ========================================================= */
+function keepRange(h,wantDist){
+  let a=Math.atan2(h.y-boss.y,h.x-boss.x);
+  if(h.x===boss.x && h.y===boss.y) a=rand(0,TAU);
+  h.tx=boss.x+Math.cos(a)*wantDist; h.ty=boss.y+Math.sin(a)*wantDist;
+}
+function avoidTelegraphs(h){
+  if(boss.st==='waveWind'){
+    if(dist(h,boss)<170){ const a=Math.atan2(h.y-boss.y,h.x-boss.x); h.tx=boss.x+Math.cos(a)*190; h.ty=boss.y+Math.sin(a)*190; }
+  }else if(boss.st==='slamWind'){
+    const ang=Math.atan2(h.y-boss.y,h.x-boss.x);
+    if(dist(h,boss)<boss.r+90 && Math.abs(angDiff(ang,boss.aim))<1.05){
+      const side=angDiff(ang,boss.aim)>0?1:-1;
+      h.tx=boss.x+Math.cos(ang+side*0.9)*140; h.ty=boss.y+Math.sin(ang+side*0.9)*140;
+    }
+  }else if(boss.st==='beamWind' && h.role!=='tk'){
+    const ang=Math.atan2(h.y-boss.y,h.x-boss.x);
+    if(dist(h,boss)<440 && Math.abs(angDiff(ang,boss.aim))<0.42){
+      const side=angDiff(ang,boss.aim)>0?1:-1;
+      const r=Math.min(dist(h,boss),300);
+      h.tx=boss.x+Math.cos(boss.aim+side*0.9)*r; h.ty=boss.y+Math.sin(boss.aim+side*0.9)*r;
+    }
+  }
+}
+function moveToward(h){
+  const dx=h.tx-h.x, dy=h.ty-h.y, d=Math.hypot(dx,dy);
+  const sp=ROLE_INFO[h.role].speed;
+  if(d>2){ h.x+=dx/d*Math.min(sp,d); h.y+=dy/d*Math.min(sp,d); }
+  const dd=Math.hypot(h.x-CX,h.y-CY);
+  if(dd>ARENA-10){ const a=Math.atan2(h.y-CY,h.x-CX); h.x=CX+Math.cos(a)*(ARENA-10); h.y=CY+Math.sin(a)*(ARENA-10); }
+}
+
+const behave={
+  tank(h){
+    const R=read();
+    const pincer = directive==='INTERRUPT' && mem.matches>=3 && R.depth>0.35;
+    if(pincer){
+      h.tx=boss.x; h.ty=boss.y;
+    }else{
+      let protectRole='healer';
+      if(R.favTarget!=='none' && R.favTarget!=='tank' && R.depth>0.3) protectRole=R.favTarget;
+      if(directive==='PROTECT_HEALER') protectRole='healer';
+      const target=heroes.find(x=>x.role===protectRole && !x.down) || heroes.find(x=>!x.down && x!==h);
+      if(target){
+        h.tx=target.x+(boss.x-target.x)*0.62;
+        h.ty=target.y+(boss.y-target.y)*0.62;
+      }else{ h.tx=boss.x; h.ty=boss.y; }
+    }
+    if(h.cd<=0 && dist(h,boss)<boss.r+ROLE_INFO.tank.range){ hurtBoss(ROLE_INFO.tank.dmg); h.cd=ROLE_INFO.tank.cd; h.atkT=12; }
+  },
+  mage(h){
+    keepRange(h, ROLE_INFO.mage.prefDist);
+    if(h.cd<=0 && dist(h,boss)<ROLE_INFO.mage.range){ hurtBoss(ROLE_INFO.mage.dmg); h.cd=ROLE_INFO.mage.cd; h.atkT=12; blip(700,.05,'square',.03); }
+  },
+  tk(h){
+    if(boss.st==='beamWind'){
+      const a=Math.atan2(boss.y-h.y,boss.x-h.x);
+      h.tx=boss.x-Math.cos(a)*150; h.ty=boss.y-Math.sin(a)*150;
+      tkAttemptInterrupt(h);
+    }else{
+      keepRange(h, ROLE_INFO.tk.prefDist);
+      if(h.cd<=0 && dist(h,boss)<ROLE_INFO.tk.range){ hurtBoss(ROLE_INFO.tk.dmg); h.cd=ROLE_INFO.tk.cd; h.atkT=12; }
+    }
+  },
+  healer(h){
+    let wantDist=ROLE_INFO.healer.prefDist;
+    if(directive==='PROTECT_HEALER') wantDist+=60;
+    keepRange(h, wantDist);
+    if(h.healCd<=0){
+      const alive=heroes.filter(x=>!x.down);
+      const target=alive.sort((a,b)=>(a.hp/a.maxHp)-(b.hp/b.maxHp))[0];
+      if(target && target.hp<target.maxHp && dist(h,target)<260){
+        target.hp=Math.min(target.maxHp,target.hp+24);
+        h.healCd=82; h.atkT=12; spark(target.x,target.y,8,hexToRgb('#6FD98F'),3); blip(880,.07,'sine',.04);
+      }
+    }
+  },
+  asn(h){
+    const R=read();
+    const pincer = directive==='INTERRUPT' && mem.matches>=3 && R.depth>0.35;
+    if(pincer){
+      h.tx=boss.x; h.ty=boss.y;
+    }else{
+      const others=heroes.filter(x=>x!==h && !x.down);
+      let cx=CX,cy=CY;
+      if(others.length){ cx=others.reduce((s,o)=>s+o.x,0)/others.length; cy=others.reduce((s,o)=>s+o.y,0)/others.length; }
+      const a=Math.atan2(cy-boss.y,cx-boss.x)+Math.PI;
+      h.tx=boss.x+Math.cos(a)*ROLE_INFO.asn.prefDist; h.ty=boss.y+Math.sin(a)*ROLE_INFO.asn.prefDist;
+    }
+    if(h.cd<=0 && dist(h,boss)<boss.r+ROLE_INFO.asn.range){ hurtBoss(ROLE_INFO.asn.dmg); h.cd=ROLE_INFO.asn.cd; h.atkT=12; }
+  }
+};
+
+function stepHeroes(){
+  dirTimer--;
+  if(dirTimer<=0){ updateDirective(); dirTimer=34; }
+  for(const h of heroes){
+    if(h.down)continue;
+    h.cd=Math.max(0,h.cd-1);
+    if(h.role==='healer') h.healCd=Math.max(0,h.healCd-1);
+    h.hurt=Math.max(0,h.hurt-1);
+    h.atkT=Math.max(0,(h.atkT||0)-1);
+    behave[h.role](h);
+    avoidTelegraphs(h);
+    moveToward(h);
+  }
+}
+
+/* =========================================================
+   DRAW
+   ========================================================= */
+function draw(){
+  ctx.save();
+  if(shake>0){ ctx.translate(rand(-shake,shake),rand(-shake,shake)); shake*=0.86; if(shake<.4)shake=0; }
+  ctx.clearRect(-40,-40,W+80,H+80);
+  ctx.fillStyle='#181330'; ctx.fillRect(-40,-40,W+80,H+80);
+
+  ctx.strokeStyle='#2A2246'; ctx.lineWidth=1;
+  for(let i=1;i<=4;i++){ctx.beginPath();ctx.arc(CX,CY,ARENA*i/4,0,TAU);ctx.stroke();}
+  for(let i=0;i<12;i++){const a=i/12*TAU;
+    ctx.beginPath();ctx.moveTo(CX+Math.cos(a)*40,CY+Math.sin(a)*40);
+    ctx.lineTo(CX+Math.cos(a)*ARENA,CY+Math.sin(a)*ARENA);ctx.stroke();}
+  ctx.strokeStyle='#3B3163'; ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(CX,CY,ARENA,0,TAU);ctx.stroke();
+
+  for(const b of bits){ b.x+=b.vx;b.y+=b.vy;b.vx*=.92;b.vy*=.92;b.life--;
+    ctx.fillStyle=`rgba(${b.col},${b.life/28})`; ctx.fillRect(b.x-2,b.y-2,4,4); }
+  bits=bits.filter(b=>b.life>0);
+
+  drawTelegraph();
+  drawHeroes();
+  drawBoss();
+  ctx.restore();
+  drawCallout();
+}
+
+function drawTelegraph(){
+  if(boss.st==='idle')return;
+  const p=boss.t/boss.dur;
+  ctx.save(); ctx.fillStyle='#FFC34D';
+  if(boss.st==='slamWind'){
+    ctx.globalAlpha=0.18+0.5*p;
+    ctx.beginPath();ctx.moveTo(boss.x,boss.y);
+    ctx.arc(boss.x,boss.y,boss.r+70,boss.aim-0.95,boss.aim+0.95);ctx.closePath();ctx.fill();
+  }else if(boss.st==='waveWind'){
+    ctx.globalAlpha=0.16+0.4*p;
+    ctx.beginPath();ctx.arc(boss.x,boss.y,155*p,0,TAU);ctx.fill();
+    ctx.globalAlpha=0.5; ctx.strokeStyle='#FFC34D'; ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(boss.x,boss.y,155,0,TAU);ctx.stroke();
+  }else if(boss.st==='beamWind'){
+    ctx.globalAlpha=0.14+0.46*p;
+    ctx.save();ctx.translate(boss.x,boss.y);ctx.rotate(boss.aim);
+    ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,430,-0.30,0.30);ctx.closePath();ctx.fill();ctx.restore();
+  }
+  ctx.restore();
+}
+/* =========================================================
+   CHARACTER RENDERING
+   Drawn 3/4 upright (Hades-style) inside a top-down arena.
+   SPRITE HOOK: drop an Image into SPRITES[role] and it is used
+   instead of the procedural figure — see loadSprite().
+   ========================================================= */
+const SPRITES={};   // role -> {img, frames, fw, fh}  (empty = procedural)
+function loadSprite(role,url,frames){
+  const img=new Image();
+  img.onload=()=>{ SPRITES[role]={img,frames:frames||1,fw:img.width/(frames||1),fh:img.height}; };
+  img.onerror=()=>{ console.warn('sprite failed, staying procedural:',role,url); };
+  img.src=url;
+}
+
+const BUILD={
+  tank:  {h:40, build:6.5, torso:1.5, weapon:'shield', robe:false, hover:false},
+  mage:  {h:34, build:4.2, torso:1.2, weapon:'staff',  robe:true,  hover:false},
+  tk:    {h:35, build:4.0, torso:1.1, weapon:'none',   robe:true,  hover:true },
+  healer:{h:33, build:4.2, torso:1.2, weapon:'staff',  robe:true,  hover:false},
+  asn:   {h:33, build:4.0, torso:1.0, weapon:'dagger', robe:false, hover:false},
+};
+
+function updateAnim(e,faceTarget){
+  if(e.px===undefined){ e.px=e.x; e.py=e.y; e.wp=0; e.bob=Math.random()*TAU; e.moveAmt=0; e.flip=1; }
+  const dx=e.x-e.px, dy=e.y-e.py, d=Math.hypot(dx,dy);
+  e.moveAmt += (Math.min(1,d/2.2)-e.moveAmt)*0.20;
+  e.wp  += d*0.30 + 0.010;
+  e.bob += 0.075;
+  if(Math.abs(dx)>0.30) e.flip = dx>0?1:-1;
+  else if(faceTarget)   e.flip = (faceTarget.x-e.x)>=0?1:-1;
+  e.px=e.x; e.py=e.y;
+}
+
+function armEnd(shoY,ang,len){ return {x:Math.sin(ang)*len, y:shoY+Math.cos(ang)*len}; }
+
+function drawFighter(e,cfg){
+  const h=cfg.h, build=cfg.build, color=cfg.color;
+  ctx.save();
+  ctx.translate(e.x,e.y);
+
+  // ground shadow — sells that they're standing in the arena
+  ctx.save();
+  ctx.globalAlpha=cfg.downed?0.10:0.26; ctx.fillStyle='#000';
+  ctx.beginPath(); ctx.ellipse(0,1,h*0.26,h*0.085,0,0,TAU); ctx.fill();
+  ctx.restore();
+
+  if(cfg.downed){
+    ctx.globalAlpha=0.30; ctx.strokeStyle=color; ctx.lineWidth=build; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(-h*0.26,-h*0.05); ctx.lineTo(h*0.18,-h*0.11); ctx.stroke();
+    ctx.fillStyle=color; ctx.beginPath(); ctx.arc(h*0.26,-h*0.14,h*0.095,0,TAU); ctx.fill();
+    ctx.restore(); return;
+  }
+
+  // role aura
+  ctx.save();
+  ctx.globalAlpha=cfg.auraA!==undefined?cfg.auraA:0.15;
+  ctx.fillStyle=color; ctx.shadowColor=color; ctx.shadowBlur=20;
+  ctx.beginPath(); ctx.ellipse(0,-h*0.44,h*0.30,h*0.52,0,0,TAU); ctx.fill();
+  ctx.restore();
+
+  // sprite path — used automatically once real art is loaded
+  const sp=SPRITES[cfg.spriteKey];
+  if(sp){
+    const fi=Math.floor(e.wp*0.9)%sp.frames;
+    const dh=h*1.35, dw=dh*(sp.fw/sp.fh);
+    ctx.save(); ctx.scale(e.flip,1);
+    if(cfg.hurt) ctx.globalAlpha=0.75;
+    ctx.drawImage(sp.img, fi*sp.fw,0,sp.fw,sp.fh, -dw/2,-dh, dw,dh);
+    ctx.restore(); ctx.restore(); return;
+  }
+
+  if(cfg.hover) ctx.translate(0, Math.sin(e.bob)*2.2 - h*0.09);
+  ctx.scale(e.flip,1);
+
+  const mv=e.moveAmt, sw=Math.sin(e.wp)*mv;
+  const hipY=-h*0.42, shoY=-h*0.72, headY=-h*0.855;
+  const atk = e.atkT>0 ? 1-(e.atkT/12) : -1;
+  const body = cfg.hurt ? '#FFF' : color;
+
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.strokeStyle=body; ctx.fillStyle=body;
+
+  // legs (or robe hem)
+  if(cfg.robe){
+    ctx.beginPath();
+    ctx.moveTo(-h*0.15,hipY); ctx.lineTo(h*0.15,hipY);
+    ctx.lineTo(h*0.12+sw*h*0.05,-h*0.01); ctx.lineTo(-h*0.12+sw*h*0.05,-h*0.01);
+    ctx.closePath(); ctx.fill();
+  }else{
+    ctx.lineWidth=build;
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo( sw*h*0.20,-h*0.02); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(-sw*h*0.20,-h*0.02); ctx.stroke();
+  }
+
+  // torso + head
+  ctx.lineWidth=build*cfg.torso;
+  ctx.beginPath(); ctx.moveTo(0,hipY); ctx.lineTo(0,shoY); ctx.stroke();
+  ctx.beginPath(); ctx.arc(0,headY,h*0.10,0,TAU); ctx.fill();
+
+  // arms — back arm swings with the walk, front arm drives the attack
+  ctx.lineWidth=build*0.8;
+  const armLen=h*0.30;
+  const backAng  = 0.30 + sw*0.55;
+  const frontAng = atk>=0 ? (-0.55 + atk*2.25) : (-0.22 - sw*0.55);
+  const bh=armEnd(shoY,backAng,armLen), fh_=armEnd(shoY,frontAng,armLen);
+  ctx.beginPath(); ctx.moveTo(0,shoY); ctx.lineTo(bh.x,bh.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,shoY); ctx.lineTo(fh_.x,fh_.y); ctx.stroke();
+
+  // weapon in the front hand
+  ctx.save(); ctx.translate(fh_.x,fh_.y);
+  if(cfg.weapon==='shield'){
+    ctx.rotate(frontAng*0.5);
+    ctx.fillStyle=body; ctx.globalAlpha=0.9;
+    ctx.beginPath(); ctx.roundRect(-h*0.045,-h*0.17,h*0.10,h*0.34,h*0.03); ctx.fill();
+  }else if(cfg.weapon==='staff'){
+    ctx.rotate(frontAng*0.8);
+    ctx.strokeStyle=body; ctx.lineWidth=build*0.5;
+    ctx.beginPath(); ctx.moveTo(0,h*0.16); ctx.lineTo(0,-h*0.34); ctx.stroke();
+    ctx.fillStyle=body; ctx.shadowColor=color; ctx.shadowBlur=12;
+    ctx.beginPath(); ctx.arc(0,-h*0.38,h*0.065,0,TAU); ctx.fill();
+  }else if(cfg.weapon==='dagger'){
+    ctx.rotate(frontAng);
+    ctx.strokeStyle=body; ctx.lineWidth=build*0.42;
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(0,-h*0.20); ctx.stroke();
+  }else if(cfg.weapon==='none'){
+    ctx.fillStyle=body; ctx.shadowColor=color; ctx.shadowBlur=14;
+    ctx.beginPath(); ctx.arc(0,0,h*0.055,0,TAU); ctx.fill();
+  }else if(cfg.weapon==='fist'){
+    ctx.fillStyle=body; ctx.shadowColor=color; ctx.shadowBlur=cfg.rage?22:12;
+    ctx.beginPath(); ctx.arc(0,0,h*0.085,0,TAU); ctx.fill();
+  }
+  ctx.restore();
+
+  ctx.restore();
+}
+
+function drawBoss(){
+  updateAnim(boss,null);
+  if(!isTouch) boss.flip = Math.cos(boss.face)>=0?1:-1;
+  const c = boss.rage?'#FF6B8A':'#E14F6B';
+  drawFighter(boss,{
+    h:64, build:11, torso:1.7, weapon:'fist', robe:false, hover:false,
+    color:c, hurt:boss.hurt>0, downed:false, rage:boss.rage,
+    auraA:boss.rage?0.30:0.18, spriteKey:'boss'
+  });
+  // crown of energy — reads as "raid boss" at a glance
+  ctx.save(); ctx.translate(boss.x,boss.y-64*0.855);
+  ctx.strokeStyle=boss.hurt>0?'#FFF':c; ctx.lineWidth=2.4; ctx.lineCap='round';
+  ctx.shadowColor=c; ctx.shadowBlur=boss.rage?18:9;
+  for(let i=-2;i<=2;i++){
+    const a=-Math.PI/2 + i*0.42, L=(i===0?15:11)*(boss.rage?1.25:1);
+    ctx.beginPath(); ctx.moveTo(Math.cos(a)*7,Math.sin(a)*7);
+    ctx.lineTo(Math.cos(a)*(7+L),Math.sin(a)*(7+L)); ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawHeroes(){
+  // paint back-to-front so nearer fighters overlap correctly
+  const order=[...heroes].sort((a,b)=>a.y-b.y);
+  for(const h of order){
+    const B=BUILD[h.role];
+    updateAnim(h,boss);
+    drawFighter(h,{
+      h:B.h, build:B.build, torso:B.torso, weapon:B.weapon, robe:B.robe, hover:B.hover,
+      color:ROLE_INFO[h.role].color, hurt:h.hurt>0, downed:h.down, spriteKey:h.role
+    });
+  }
+}
+function drawCallout(){
+  if(!callout)return;
+  const a = callout.life>55 ? (70-callout.life)/15 : Math.min(1,callout.life/50);
+  ctx.save();
+  ctx.globalAlpha=clamp(a,0,1);
+  ctx.fillStyle='#FFC34D'; ctx.textAlign='center';
+  ctx.font="700 16px 'Chakra Petch',sans-serif";
+  ctx.shadowColor='#FFC34D'; ctx.shadowBlur=10;
+  ctx.fillText(callout.text, CX, 128);
+  ctx.restore();
+}
+
+/* =========================================================
+   HUD
+   ========================================================= */
+function updateHud(){
+  $('hpBoss').firstElementChild.style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%';
+  $('bossNum').textContent=Math.max(0,Math.round(boss.hp));
+  $('bossWrap').classList.toggle('raging',boss.rage);
+  document.querySelectorAll('.hbar').forEach(bar=>{
+    const role=bar.dataset.role, h=heroes.find(x=>x.role===role);
+    const i=bar.firstElementChild;
+    i.style.width=(h?Math.max(0,h.hp/h.maxHp*100):0)+'%';
+    i.style.background=ROLE_INFO[role].color;
+    bar.style.opacity=(h&&h.down)?0.35:1;
+  });
+  $('dirVal').textContent=directive.replace('_',' ');
+}
+
+/* =========================================================
+   LOOP
+   ========================================================= */
+function tick(){
+  requestAnimationFrame(tick);
+  if(callout){ callout.life--; if(callout.life<=0) callout=null; }
+  if(state==='play'){
+    if(freeze>0){ freeze--; } else { stepBoss(); stepHeroes(); }
+    updateHud();
+  }
+  draw();
+}
+
+/* =========================================================
+   RUN START / END
+   ========================================================= */
+function paintRunTag(){
+  $('runTag').innerHTML = mem.matches
+    ? `MATCH ${String(mem.matches+1).padStart(2,'0')} · THE SQUAD HAS <b>${mem.matches}</b> MATCH${mem.matches>1?'ES':''} ON YOU`
+    : `MATCH 01 · THE SQUAD'S FILE ON YOU IS EMPTY`;
+  updateMasteryNote();
+}
+function updateMasteryNote(){
+  const el=$('masteryNote');
+  if(mem.matches>=3){
+    el.style.display='block';
+    el.textContent="They've fought you enough to start covering your favorite target before you reach it — lean on Beam and the Tank and Assassin may start rushing you together the moment you commit.";
+  }else{ el.style.display='none'; }
+}
+function start(){
+  reset(); state='play'; paintRunTag();
+  $('scStart').classList.add('hide'); $('scEnd').classList.add('hide');
+}
+function end(playerWon){
+  if(state==='over') return;
+  state='over';
+  mem.matches++;
+  if(playerWon) mem.squadLosses++; else mem.squadWins++;
+  saveMem(); paintRunTag();
+
+  const R=read(), notes=[];
+  if(R.favTarget!=='none') notes.push(`You went after the <b>${ROLE_INFO[R.favTarget].label}</b> ${Math.round(R.favP*100)}% of the time. Expect the Tank to already be there.`);
+  if(R.favAbility!=='none') notes.push(`<b>${Math.round(R.favAbilityP*100)}%</b> of your casts were ${R.favAbility.toUpperCase()}. The squad is starting to react to it early.`);
+  if(matchInterrupts>0) notes.push(`The Telekinetic stopped your Beam <b>${matchInterrupts}</b> time${matchInterrupts>1?'s':''} this match.`);
+  if(matchPincers>0) notes.push(`The Tank and Assassin pincered your Beam windup <b>${matchPincers}</b> time${matchPincers>1?'s':''} this match.`);
+  if(R.aggression>190) notes.push(`You like to fight near the walls. The Healer will hold less ground next time.`);
+  else if(R.aggression && R.aggression<110) notes.push(`You stay central. The squad will spread wider before you swing.`);
+  if(!notes.length) notes.push(`Not enough on you yet. Fight a few more matches and the file fills in.`);
+
+  $('endKick').textContent = playerWon?'THE SQUAD FALLS':'THE FILE GROWS';
+  $('endTitle').innerHTML = playerWon?'YOU <span>WIN</span>':'THEY <span>ADAPT</span>';
+  $('endLearned').innerHTML = notes.map(n=>`<div>${n}</div>`).join('');
+  $('scEnd').classList.remove('hide');
+}
+
+/* =========================================================
+   DOSSIER
+   ========================================================= */
+let prevState='menu';
+function openFile(){
+  if(state==='file')return;
+  prevState=state; state='file';
+  renderFile();
+  $('scFile').classList.remove('hide');
+}
+function closeFile(){
+  state=prevState;
+  $('scFile').classList.add('hide');
+}
+function renderFile(){
+  $('fileMatches').textContent=mem.matches;
+  const R=read(), rows=[];
+  if(R.totalHits>=4){
+    for(const r of ROLES){
+      const pct=R.totalHits?Math.round(mem.hits[r]/R.totalHits*100):0;
+      rows.push(`<div class="frow"><div class="flabel"><span>HITS LANDED ON ${ROLE_INFO[r].label}</span><b>${pct}%</b></div><div class="ftrack"><i style="width:${pct}%;background:${ROLE_INFO[r].color}"></i></div></div>`);
+    }
+  }
+  const abl=mem.abilityUse, totalAbl=abl.slam+abl.shockwave+abl.beam;
+  if(totalAbl>=4){
+    for(const a of ['slam','shockwave','beam']){
+      const pct=Math.round(abl[a]/totalAbl*100);
+      rows.push(`<div class="frow"><div class="flabel"><span>${a.toUpperCase()} USAGE</span><b>${pct}%</b></div><div class="ftrack"><i style="width:${pct}%"></i></div></div>`);
+    }
+  }
+  if(abl.beam>=3){
+    const pct=Math.round(mem.beamInterrupted/abl.beam*100);
+    rows.push(`<div class="frow"><div class="flabel"><span>BEAM INTERRUPT RATE</span><b>${pct}%</b></div><div class="ftrack"><i style="width:${pct}%"></i></div></div>`);
+  }
+  if(mem.aggroN>8){
+    rows.push(`<div class="frow"><div class="flabel"><span>AVG DISTANCE FROM CENTER WHEN YOU ATTACK</span><b>${Math.round(mem.aggroSum/mem.aggroN)}px</b></div></div>`);
+  }
+  rows.push(`<div class="frow"><div class="flabel"><span>HOW MUCH THE SQUAD TRUSTS THIS FILE</span><b>${Math.round(R.depth*100)}%</b></div><div class="ftrack"><i style="width:${Math.round(R.depth*100)}%;background:var(--warn)"></i></div></div>`);
+  $('fileBody').innerHTML = rows.length ? rows.join('') : '<p class="fempty">Nothing on record yet. Fight a few matches.</p>';
+}
+
+$('btnStart').addEventListener('click',start);
+$('btnAgain').addEventListener('click',start);
+$('btnFile').addEventListener('click',openFile);
+$('btnFileClose').addEventListener('click',closeFile);
+$('btnWipe').addEventListener('click',async()=>{
+  mem=blank(); try{await window.storage.delete(KEY);}catch(e){}
+  paintRunTag(); $('btnWipe').textContent='ERASED — THEY KNOW NOTHING';
+});
+
+reset(); loadMem(); tick();
+</script>
+</body>
+</html>
