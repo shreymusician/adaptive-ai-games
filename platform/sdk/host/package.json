@@ -8,5 +8,12 @@
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run --root ."
+  },
+  "dependencies": {
+    "@adaptive-ai/sdk-protocol": "*"
+  },
+  "devDependencies": {
+    "@adaptive-ai/sdk-client": "*",
+    "vitest": "^4.1.10"
   }
 }

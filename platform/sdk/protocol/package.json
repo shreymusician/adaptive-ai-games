@@ -1,16 +1,13 @@
 {
-  "name": "@adaptive-ai/sdk-client",
+  "name": "@adaptive-ai/sdk-protocol",
   "version": "0.0.0",
   "private": true,
-  "description": "Game SDK — runs inside the plugin iframe (emit, getLegalActions, submitDecision)",
+  "description": "Shared types and postMessage contract between sdk-client and sdk-host — types only, no runtime coupling between the two trust domains",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
     "test": "vitest run --root ."
-  },
-  "dependencies": {
-    "@adaptive-ai/sdk-protocol": "*"
   },
   "devDependencies": {
     "vitest": "^4.1.10"
