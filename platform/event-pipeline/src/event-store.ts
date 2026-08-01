@@ -180,4 +180,49 @@ export class EventStore {
   async getEventsByType(eventType: CanonicalEventType, limit: number = 100): Promise<StoredEvent[]> {
     return this.events.find({ type: eventType }).sort({ serverTs: -1 }).limit(limit).toArray();
   }
+
+  /**
+   * General-purpose replay query backing GET /api/events/replay — supports
+   * any combination of match/player/game scoping plus a sequence range
+   * and/or a server-timestamp window. Returned in seq order when scoped to
+   * a single match (deterministic replay), otherwise in serverTs order.
+   */
+  async queryEvents(
+    criteria: {
+      matchId?: string;
+      playerId?: string;
+      gameId?: string;
+      fromSeq?: number;
+      toSeq?: number;
+      fromTs?: number;
+      toTs?: number;
+      type?: CanonicalEventType;
+    },
+    limit: number = 100,
+    offset: number = 0
+  ): Promise<{ events: StoredEvent[]; total: number }> {
+    const filter: Record<string, any> = {};
+    if (criteria.matchId) filter.matchId = criteria.matchId;
+    if (criteria.playerId) filter.playerId = criteria.playerId;
+    if (criteria.gameId) filter.gameId = criteria.gameId;
+    if (criteria.type) filter.type = criteria.type;
+    if (criteria.fromSeq !== undefined || criteria.toSeq !== undefined) {
+      filter.seq = {};
+      if (criteria.fromSeq !== undefined) filter.seq.$gte = criteria.fromSeq;
+      if (criteria.toSeq !== undefined) filter.seq.$lte = criteria.toSeq;
+    }
+    if (criteria.fromTs !== undefined || criteria.toTs !== undefined) {
+      filter.serverTs = {};
+      if (criteria.fromTs !== undefined) filter.serverTs.$gte = criteria.fromTs;
+      if (criteria.toTs !== undefined) filter.serverTs.$lte = criteria.toTs;
+    }
+
+    const sort: Record<string, 1> = criteria.matchId ? { seq: 1 } : { serverTs: 1 };
+
+    const [events, total] = await Promise.all([
+      this.events.find(filter as Filter<StoredEvent>).sort(sort).skip(offset).limit(limit).toArray(),
+      this.events.countDocuments(filter as Filter<StoredEvent>),
+    ]);
+    return { events, total };
+  }
 }

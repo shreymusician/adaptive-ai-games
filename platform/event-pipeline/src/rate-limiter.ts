@@ -11,7 +11,11 @@ import { MetricsRegistry } from './metrics';
  */
 export class RateLimiter {
   private readonly hits = new Map<string, number[]>();
-  private lastSweep = Date.now();
+  /** -Infinity so the very first check() always performs an (empty, cheap) sweep
+   *  and anchors lastSweep to the caller's own clock — real or injected `now`
+   *  — rather than to wall-clock time at construction, which would desync
+   *  from tests that pass explicit `now` values far from Date.now(). */
+  private lastSweep = -Infinity;
 
   constructor(
     private readonly windowMs: number,
