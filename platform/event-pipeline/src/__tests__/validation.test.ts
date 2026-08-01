@@ -9,7 +9,7 @@ describe('validateEvent', () => {
       seq: 1,
       ts: Date.now(),
     };
-    const result = validateEvent(event, 0, '1');
+    const result = validateEvent(event);
     expect(result.valid).toBe(true);
   });
 
@@ -19,7 +19,7 @@ describe('validateEvent', () => {
       payload: {},
       seq: 1,
     };
-    const result = validateEvent(event, 0, '1');
+    const result = validateEvent(event);
     expect(result.valid).toBe(false);
   });
 
@@ -28,7 +28,7 @@ describe('validateEvent', () => {
       type: 'PlayerMoved',
       payload: {},
     };
-    const result = validateEvent(event, 0, '1');
+    const result = validateEvent(event);
     expect(result.valid).toBe(false);
   });
 
@@ -38,7 +38,7 @@ describe('validateEvent', () => {
       payload: {},
       seq: 1.5,
     };
-    const result = validateEvent(event, 0, '1');
+    const result = validateEvent(event);
     expect(result.valid).toBe(false);
   });
 
@@ -48,7 +48,7 @@ describe('validateEvent', () => {
       payload: {},
       seq: -1,
     };
-    const result = validateEvent(event, 0, '1');
+    const result = validateEvent(event);
     expect(result.valid).toBe(false);
   });
 
@@ -58,7 +58,7 @@ describe('validateEvent', () => {
       payload: { data: 'x'.repeat(15 * 1024) },
       seq: 1,
     };
-    const result = validateEvent(event, 0, '1');
+    const result = validateEvent(event);
     expect(result.valid).toBe(false);
   });
 
@@ -67,9 +67,9 @@ describe('validateEvent', () => {
       type: 'PlayerMoved',
       payload: {},
       seq: 1,
-      ts: Date.now() + 2 * 60 * 1000, // 2 minutes from now
+      ts: Date.now() + 2 * 60 * 1000,
     };
-    const result = validateEvent(event, 0, '1');
+    const result = validateEvent(event);
     expect(result.valid).toBe(false);
   });
 
@@ -78,9 +78,9 @@ describe('validateEvent', () => {
       type: 'PlayerMoved',
       payload: {},
       seq: 1,
-      ts: Date.now() - 48 * 60 * 60 * 1000, // 48 hours ago
+      ts: Date.now() - 48 * 60 * 60 * 1000,
     };
-    const result = validateEvent(event, 0, '1');
+    const result = validateEvent(event);
     expect(result.valid).toBe(true);
     if (result.valid) {
       expect(result.warnings.length).toBeGreaterThan(0);
@@ -128,9 +128,9 @@ describe('validateBatch', () => {
   it('reports per-event errors', () => {
     const batch = {
       events: [
-        { type: 'PlayerMoved', payload: {}, seq: 1 }, // valid
-        { type: 'Invalid', payload: {}, seq: 2 }, // invalid type
-        { type: 'PlayerDamaged', payload: {}, seq: 'not-a-number' }, // invalid seq
+        { type: 'PlayerMoved', payload: {}, seq: 1 },
+        { type: 'Invalid', payload: {}, seq: 2 },
+        { type: 'PlayerDamaged', payload: {}, seq: 'not-a-number' },
       ],
     };
     const result = validateBatch(batch);
@@ -163,7 +163,7 @@ describe('validateSequencing', () => {
 
   it('detects gaps between batches', () => {
     const events = [{ seq: 5 }, { seq: 6 }];
-    const result = validateSequencing(events, 2); // last was 2, expecting 3
+    const result = validateSequencing(events, 2);
     expect(result.valid).toBe(true);
     if (result.valid) {
       expect(result.gaps).toContain(3);

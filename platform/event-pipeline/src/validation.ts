@@ -1,5 +1,4 @@
-import { CanonicalEventType, isCanonicalEventType, isAction } from '@adaptive-ai/sdk-protocol';
-import { ValidationError } from './types';
+import { isCanonicalEventType } from '@adaptive-ai/sdk-protocol';
 
 const MAX_PAYLOAD_SIZE = 10 * 1024; // 10KB per event
 const MAX_TIMESTAMP_OFFSET = 60 * 1000; // 1 minute from now
@@ -8,8 +7,6 @@ const MIN_TIMESTAMP_OFFSET = 24 * 60 * 60 * 1000; // 24 hours ago
 /** Validates a single event from a batch */
 export function validateEvent(
   event: unknown,
-  index: number,
-  schemaVersion: string,
   now: number = Date.now()
 ): { valid: true; warnings: string[] } | { valid: false; error: string } {
   if (!event || typeof event !== 'object') {
@@ -41,7 +38,7 @@ export function validateEvent(
 
   // Validate timestamp (optional, defaults to now)
   const warnings: string[] = [];
-  let ts = e.ts as number | undefined;
+  const ts = e.ts as number | undefined;
   if (ts !== undefined) {
     if (typeof ts !== 'number' || !Number.isFinite(ts)) {
       return { valid: false, error: 'ts must be a valid number' };
@@ -86,7 +83,7 @@ export function validateBatch(
   const validEvents: Array<{ seq: number; type: string; payload: Record<string, unknown>; ts?: number }> = [];
 
   for (let i = 0; i < b.events.length; i++) {
-    const result = validateEvent(b.events[i], i, '1');
+    const result = validateEvent(b.events[i]);
     if (!result.valid) {
       errors.push(`Event ${i}: ${result.error}`);
     } else {

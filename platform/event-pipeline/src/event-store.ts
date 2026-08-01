@@ -1,5 +1,5 @@
 import { Db, Collection, Filter } from 'mongodb';
-import { CanonicalEvent } from '@adaptive-ai/sdk-protocol';
+import { CanonicalEvent, CanonicalEventType } from '@adaptive-ai/sdk-protocol';
 import { v4 as uuidv4 } from 'uuid';
 import { StoredEvent } from './types';
 
@@ -114,13 +114,13 @@ export class EventStore {
 
   /** Replays events for a match in a time window */
   async replayMatch(matchId: string, fromSeq?: number, toSeq?: number): Promise<StoredEvent[]> {
-    const filter: Filter<StoredEvent> = { matchId };
+    const filter: Record<string, any> = { matchId };
     if (fromSeq !== undefined || toSeq !== undefined) {
       filter.seq = {};
-      if (fromSeq !== undefined) (filter.seq as any).$gte = fromSeq;
-      if (toSeq !== undefined) (filter.seq as any).$lte = toSeq;
+      if (fromSeq !== undefined) filter.seq.$gte = fromSeq;
+      if (toSeq !== undefined) filter.seq.$lte = toSeq;
     }
-    return this.events.find(filter).sort({ seq: 1 }).toArray();
+    return this.events.find(filter as Filter<StoredEvent>).sort({ seq: 1 }).toArray();
   }
 
   /** Detects duplicate events (by matchId + seq) */
@@ -141,7 +141,7 @@ export class EventStore {
   }
 
   /** Gets events by type */
-  async getEventsByType(type: string, limit: number = 100): Promise<StoredEvent[]> {
-    return this.events.find({ type }).sort({ serverTs: -1 }).limit(limit).toArray();
+  async getEventsByType(eventType: CanonicalEventType, limit: number = 100): Promise<StoredEvent[]> {
+    return this.events.find({ type: eventType }).sort({ serverTs: -1 }).limit(limit).toArray();
   }
 }

@@ -5,7 +5,6 @@ export type {
   EventBatchRequest,
   StoredEvent,
   EventBatchResult,
-  ValidationError,
   MatchToken,
   SequenceState,
   PipelineHealth,
