@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Example Dummy Game - Adaptive AI Platform SDK Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #333;
+    }
+    .container {
+      max-width: 600px;
+      width: 90%;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 40px;
+    }
+    h1 {
+      margin-bottom: 10px;
+      font-size: 28px;
+      color: #667eea;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .status {
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+    .status.waiting {
+      background: #fef3c7;
+      border-left: 4px solid #f59e0b;
+      color: #92400e;
+    }
+    .status.connected {
+      background: #dcfce7;
+      border-left: 4px solid #22c55e;
+      color: #166534;
+    }
+    .status.error {
+      background: #fee2e2;
+      border-left: 4px solid #ef4444;
+      color: #7f1d1d;
+    }
+    .status code {
+      background: rgba(0, 0, 0, 0.05);
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .game-state {
+      background: #f8f9fa;
+      border: 1px solid #e9ecef;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      font-family: monospace;
+      font-size: 12px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .game-state h3 {
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: #333;
+      font-weight: 600;
+    }
+    .game-state pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 20px 0;
+    }
+    button {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    .btn-primary:hover:not(:disabled) {
+      background: #5568d3;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    .btn-secondary {
+      background: #e9ecef;
+      color: #333;
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: #dee2e6;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .events-log {
+      background: #1a1a1a;
+      color: #00ff00;
+      border-radius: 8px;
+      padding: 15px;
+      max-height: 150px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .event-item {
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎮 Dummy Game Demo</h1>
+    <p class="subtitle">Demonstrates the Adaptive AI Platform SDK</p>
+
+    <div id="status" class="status waiting">Initializing SDK...</div>
+
+    <div class="controls">
+      <button class="btn-primary" id="moveBtn" disabled>Move Hero</button>
+      <button class="btn-primary" id="attackBtn" disabled>Attack Enemy</button>
+      <button class="btn-secondary" id="resetBtn">Reset Game</button>
+    </div>
+
+    <div class="game-state">
+      <h3>Game State</h3>
+      <pre id="gameState">Waiting for SDK initialization...</pre>
+    </div>
+
+    <div class="game-state">
+      <h3>Events Log</h3>
+      <div class="events-log" id="eventsLog"></div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // DUMMY GAME STATE
+    // =========================================================================
+
+    let gameState = {
+      heroPos: { x: 0, y: 0 },
+      enemyPos: { x: 10, y: 10 },
+      heroHealth: 100,
+      enemyHealth: 100,
+      round: 0,
+      gameActive: true,
+    };
+
+    const eventsLog = [];
+
+    function log(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      eventsLog.push(`[${timestamp}] ${message}`);
+      if (eventsLog.length > 50) eventsLog.shift();
+      updateEventsLog();
+    }
+
+    function updateEventsLog() {
+      const logEl = document.getElementById('eventsLog');
+      logEl.innerHTML = eventsLog.map((e) => `<div class="event-item">${e}</div>`).join('');
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function updateGameStateDisplay() {
+      const stateEl = document.getElementById('gameState');
+      stateEl.textContent = JSON.stringify(gameState, null, 2);
+    }
+
+    // =========================================================================
+    // SDK INTEGRATION
+    // =========================================================================
+
+    let sdk = null;
+    const statusEl = document.getElementById('status');
+
+    async function initSDK() {
+      try {
+        // In production, this would be a real ESM import:
+        // import { createGameSDK } from '@adaptive-ai/sdk-client'
+        // For now, we show the pattern:
+
+        // Since this is a demo HTML file (not a bundled app), we'd need to:
+        // 1. Bundle the SDK into a single JS file the plugin can load
+        // 2. Or use a CDN version
+        // For this example, we'll simulate the SDK availability
+
+        log('SDK: Waiting for createGameSDK function...');
+
+        // In a real app, you'd do:
+        // const { createGameSDK } = await import('@adaptive-ai/sdk-client');
+        // sdk = createGameSDK({ targetOrigin: window.location.origin });
+
+        // Simulate SDK initialization by checking if parent window is listening
+        window.addEventListener('message', handleParentMessage);
+
+        // Send a test greeting to the parent
+        window.parent.postMessage(
+          {
+            channel: 'adaptive-ai-sdk/v1',
+            kind: 'clientGreeting',
+            sdkVersion: '0.1.0',
+            requestedSchemaVersion: '1',
+          },
+          '*'
+        );
+
+        log('SDK: Sent greeting to parent window');
+        updateStatus('Connecting to platform...', 'waiting');
+      } catch (error) {
+        log(`SDK Error: ${error.message}`);
+        updateStatus(`SDK Error: ${error.message}`, 'error');
+      }
+    }
+
+    function handleParentMessage(event) {
+      const msg = event.data;
+      if (!msg || msg.channel !== 'adaptive-ai-sdk/v1') return;
+
+      if (msg.kind === 'hostGreeting') {
+        if (msg.accepted) {
+          log(`SDK: Handshake accepted! Using schema v${msg.agreedSchemaVersion}`);
+          updateStatus('Connected to platform ✓', 'connected');
+          setupGameControls();
+        } else {
+          log(`SDK: Handshake rejected: ${msg.reason}`);
+          updateStatus(`Connection rejected: ${msg.reason}`, 'error');
+        }
+        return;
+      }
+
+      if (msg.kind === 'legalActionsRequest') {
+        log(`SDK: Platform requesting legal actions for entity "${msg.entityId}"`);
+        const actions = getLegalActions(msg.entityId);
+        log(`SDK: Responding with ${actions.length} legal actions`);
+        window.parent.postMessage(
+          {
+            channel: 'adaptive-ai-sdk/v1',
+            kind: 'legalActionsResponse',
+            requestId: msg.requestId,
+            entityId: msg.entityId,
+            actions,
+          },
+          '*'
+        );
+        return;
+      }
+
+      if (msg.kind === 'submitDecision') {
+        log(`SDK: Platform decided for entity "${msg.entityId}": ${msg.action.id}`);
+        applyDecision(msg.entityId, msg.action);
+        window.parent.postMessage(
+          {
+            channel: 'adaptive-ai-sdk/v1',
+            kind: 'decisionAck',
+            requestId: msg.requestId,
+          },
+          '*'
+        );
+        return;
+      }
+    }
+
+    function setupGameControls() {
+      document.getElementById('moveBtn').disabled = false;
+      document.getElementById('attackBtn').disabled = false;
+
+      document.getElementById('moveBtn').addEventListener('click', () => {
+        emitEvent('PlayerMoved', { from: { ...gameState.heroPos }, to: { x: gameState.heroPos.x + 1, y: gameState.heroPos.y } });
+        gameState.heroPos.x += 1;
+        updateGameStateDisplay();
+      });
+
+      document.getElementById('attackBtn').addEventListener('click', () => {
+        const damage = Math.floor(Math.random() * 20) + 10;
+        emitEvent('PlayerDamaged', { damage, targetHealth: Math.max(0, gameState.enemyHealth - damage) });
+        gameState.enemyHealth = Math.max(0, gameState.enemyHealth - damage);
+        updateGameStateDisplay();
+        if (gameState.enemyHealth === 0) {
+          emitEvent('MatchEnded', { winner: 'hero', reason: 'enemy_defeated' });
+          gameState.gameActive = false;
+          document.getElementById('moveBtn').disabled = true;
+          document.getElementById('attackBtn').disabled = true;
+        }
+      });
+
+      document.getElementById('resetBtn').addEventListener('click', () => {
+        gameState = {
+          heroPos: { x: 0, y: 0 },
+          enemyPos: { x: 10, y: 10 },
+          heroHealth: 100,
+          enemyHealth: 100,
+          round: 0,
+          gameActive: true,
+        };
+        eventsLog.length = 0;
+        document.getElementById('moveBtn').disabled = false;
+        document.getElementById('attackBtn').disabled = false;
+        updateGameStateDisplay();
+        updateEventsLog();
+        emitEvent('MatchStarted', { matchDuration: null });
+        log('Game reset');
+      });
+
+      // Start the game
+      emitEvent('MatchStarted', { matchDuration: null });
+    }
+
+    function getLegalActions(entityId) {
+      if (entityId === 'hero') {
+        return [
+          { id: 'move-forward', params: { direction: 'forward' } },
+          { id: 'move-backward', params: { direction: 'backward' } },
+          { id: 'attack', params: { target: 'enemy' } },
+          { id: 'defend' },
+        ];
+      } else if (entityId === 'enemy') {
+        return [{ id: 'attack', params: { target: 'hero' } }, { id: 'move-away' }, { id: 'defend' }];
+      }
+      return [];
+    }
+
+    function applyDecision(entityId, action) {
+      if (entityId === 'hero' && action.id === 'move-forward') {
+        gameState.heroPos.x += 1;
+        emitEvent('PlayerMoved', { from: { ...gameState.heroPos }, direction: 'forward' });
+      } else if (entityId === 'enemy' && action.id === 'attack') {
+        const damage = Math.floor(Math.random() * 15) + 5;
+        gameState.heroHealth = Math.max(0, gameState.heroHealth - damage);
+        emitEvent('PlayerDamaged', { damage, targetHealth: gameState.heroHealth });
+        if (gameState.heroHealth === 0) {
+          emitEvent('MatchEnded', { winner: 'enemy', reason: 'player_defeated' });
+          gameState.gameActive = false;
+        }
+      }
+      updateGameStateDisplay();
+    }
+
+    function emitEvent(type, payload) {
+      window.parent.postMessage(
+        {
+          channel: 'adaptive-ai-sdk/v1',
+          kind: 'emit',
+          seq: Math.floor(Math.random() * 1000000),
+          event: { type, payload, ts: Date.now() },
+        },
+        '*'
+      );
+      log(`Emit: ${type} ${JSON.stringify(payload).slice(0, 50)}`);
+    }
+
+    function updateStatus(message, state) {
+      const el = document.getElementById('status');
+      el.textContent = message;
+      el.className = `status ${state}`;
+    }
+
+    // Start everything
+    updateGameStateDisplay();
+    initSDK();
+  </script>
+</body>
+</html>

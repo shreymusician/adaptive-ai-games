@@ -10,13 +10,15 @@ describe('GameSDK.emit', () => {
   beforeEach(() => {
     transport = new FakeMessageTransport();
     sdk = new GameSDK(transport, 'https://platform.example');
+    sdk.start();
+    transport.simulateHandshakeAccepted();
   });
 
   it('posts a well-formed emit message for the given event', () => {
     sdk.emit({ type: 'PlayerMoved', payload: { x: 1, y: 2 } });
 
-    expect(transport.sent).toHaveLength(1);
-    expect(transport.sent[0]).toEqual({
+    expect(transport.sent).toHaveLength(2); // clientGreeting + emit
+    expect(transport.sent[1]).toEqual({
       message: {
         channel: SDK_MESSAGE_CHANNEL,
         kind: 'emit',
@@ -32,13 +34,15 @@ describe('GameSDK.emit', () => {
     sdk.emit({ type: 'PlayerDamaged', payload: { amount: 5 } });
     sdk.emit({ type: 'PlayerDied', payload: {} });
 
-    expect(transport.sent.map((s) => (s.message as { seq: number }).seq)).toEqual([1, 2, 3]);
+    expect(transport.sent.slice(1).map((s) => (s.message as { seq: number }).seq)).toEqual([1, 2, 3]);
   });
 
   it('defaults targetOrigin to "*" when not specified', () => {
     const openSdk = new GameSDK(transport);
+    openSdk.start();
+    transport.simulateHandshakeAccepted();
     openSdk.emit({ type: 'PlayerMoved', payload: {} });
-    expect(transport.sent[0].targetOrigin).toBe('*');
+    expect(transport.sent[1].targetOrigin).toBe('*');
   });
 });
 
@@ -74,6 +78,7 @@ describe('GameSDK legal actions request handling', () => {
     transport = new FakeMessageTransport();
     sdk = new GameSDK(transport, 'https://platform.example');
     sdk.start();
+    transport.simulateHandshakeAccepted();
   });
 
   it('answers a legalActionsRequest by calling the registered provider and posting the result', () => {
@@ -108,7 +113,7 @@ describe('GameSDK legal actions request handling', () => {
       entityId: 'boss-entity',
     });
 
-    expect(transport.sent[0]).toEqual({
+    expect(transport.sent).toContainEqual({
       message: { channel: SDK_MESSAGE_CHANNEL, kind: 'legalActionsResponse', requestId: 'req-2', entityId: 'boss-entity', actions: [] },
       targetOrigin: 'https://platform.example',
     });
@@ -123,6 +128,7 @@ describe('GameSDK decision handling', () => {
     transport = new FakeMessageTransport();
     sdk = new GameSDK(transport, 'https://platform.example');
     sdk.start();
+    transport.simulateHandshakeAccepted();
   });
 
   it('invokes the registered decision handler and acknowledges receipt', () => {
@@ -166,10 +172,11 @@ describe('GameSDK robustness against foreign/malformed postMessage traffic', () 
     const sdk = new GameSDK(transport);
     sdk.start();
 
+    const beforeCount = transport.sent.length; // capture greeting count
     expect(() =>
       transport.simulateIncoming({ channel: 'some-browser-extension', kind: 'legalActionsRequest', requestId: 'x', entityId: 'y' })
     ).not.toThrow();
-    expect(transport.sent).toHaveLength(0);
+    expect(transport.sent).toHaveLength(beforeCount); // no response to foreign channel
   });
 
   it('ignores completely unrelated message shapes', () => {
@@ -177,9 +184,10 @@ describe('GameSDK robustness against foreign/malformed postMessage traffic', () 
     const sdk = new GameSDK(transport);
     sdk.start();
 
+    const beforeCount = transport.sent.length; // capture greeting count
     expect(() => transport.simulateIncoming('just a string')).not.toThrow();
     expect(() => transport.simulateIncoming(null)).not.toThrow();
     expect(() => transport.simulateIncoming({ unrelated: true })).not.toThrow();
-    expect(transport.sent).toHaveLength(0);
+    expect(transport.sent).toHaveLength(beforeCount); // no response to garbage
   });
 });

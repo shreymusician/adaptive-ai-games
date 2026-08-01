@@ -1,7 +1,7 @@
 import { GameSDK } from './game-sdk';
 import { WindowMessageTransport } from './transport';
 
-export { GameSDK } from './game-sdk';
+export { GameSDK, HandshakeRejectedError } from './game-sdk';
 export type { LegalActionsProvider, DecisionHandler } from './game-sdk';
 export { WindowMessageTransport } from './transport';
 export type { MessageTransport } from './transport';

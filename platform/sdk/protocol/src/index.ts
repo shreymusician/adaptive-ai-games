@@ -11,11 +11,15 @@ export type { CanonicalEventType, EmitEventInput, CanonicalEvent, Action, GamePl
 
 export { SDK_MESSAGE_CHANNEL, parseClientToHostMessage, parseHostToClientMessage } from './messages';
 export type {
+  ClientGreetingMessage,
   EmitMessage,
   LegalActionsResponseMessage,
   DecisionAckMessage,
   ClientToHostMessage,
+  HostGreetingMessage,
   LegalActionsRequestMessage,
   SubmitDecisionMessage,
   HostToClientMessage,
 } from './messages';
+
+export { SDK_VERSION, isCompatibleSdkVersion } from './version';

@@ -12,6 +12,13 @@ export const SDK_MESSAGE_CHANNEL = 'adaptive-ai-sdk/v1' as const;
 // Client (plugin, untrusted) -> Host (platform, trusted)
 // ---------------------------------------------------------------------------
 
+export interface ClientGreetingMessage {
+  channel: typeof SDK_MESSAGE_CHANNEL;
+  kind: 'clientGreeting';
+  sdkVersion: string;
+  requestedSchemaVersion: string;
+}
+
 export interface EmitMessage {
   channel: typeof SDK_MESSAGE_CHANNEL;
   kind: 'emit';
@@ -33,11 +40,20 @@ export interface DecisionAckMessage {
   requestId: string;
 }
 
-export type ClientToHostMessage = EmitMessage | LegalActionsResponseMessage | DecisionAckMessage;
+export type ClientToHostMessage = ClientGreetingMessage | EmitMessage | LegalActionsResponseMessage | DecisionAckMessage;
 
 // ---------------------------------------------------------------------------
 // Host (platform, trusted) -> Client (plugin, untrusted)
 // ---------------------------------------------------------------------------
+
+export interface HostGreetingMessage {
+  channel: typeof SDK_MESSAGE_CHANNEL;
+  kind: 'hostGreeting';
+  accepted: boolean;
+  reason?: string;
+  agreedSchemaVersion?: string;
+  sdkVersion: string;
+}
 
 export interface LegalActionsRequestMessage {
   channel: typeof SDK_MESSAGE_CHANNEL;
@@ -54,7 +70,7 @@ export interface SubmitDecisionMessage {
   action: Action;
 }
 
-export type HostToClientMessage = LegalActionsRequestMessage | SubmitDecisionMessage;
+export type HostToClientMessage = HostGreetingMessage | LegalActionsRequestMessage | SubmitDecisionMessage;
 
 // ---------------------------------------------------------------------------
 // Runtime parsers — postMessage delivers `unknown`, never trust the static
@@ -72,6 +88,11 @@ const hasChannel = (value: unknown): value is { channel: unknown; kind: unknown 
 export const parseClientToHostMessage = (data: unknown): ClientToHostMessage | null => {
   if (!hasChannel(data)) return null;
   const v = data as Record<string, unknown>;
+
+  if (v.kind === 'clientGreeting') {
+    if (typeof v.sdkVersion !== 'string' || typeof v.requestedSchemaVersion !== 'string') return null;
+    return { channel: SDK_MESSAGE_CHANNEL, kind: 'clientGreeting', sdkVersion: v.sdkVersion, requestedSchemaVersion: v.requestedSchemaVersion };
+  }
 
   if (v.kind === 'emit') {
     if (typeof v.seq !== 'number' || !isEmitEventInput(v.event)) return null;
@@ -102,6 +123,20 @@ export const parseClientToHostMessage = (data: unknown): ClientToHostMessage | n
 export const parseHostToClientMessage = (data: unknown): HostToClientMessage | null => {
   if (!hasChannel(data)) return null;
   const v = data as Record<string, unknown>;
+
+  if (v.kind === 'hostGreeting') {
+    if (typeof v.accepted !== 'boolean' || typeof v.sdkVersion !== 'string') return null;
+    if (v.reason !== undefined && typeof v.reason !== 'string') return null;
+    if (v.agreedSchemaVersion !== undefined && typeof v.agreedSchemaVersion !== 'string') return null;
+    return {
+      channel: SDK_MESSAGE_CHANNEL,
+      kind: 'hostGreeting',
+      accepted: v.accepted,
+      reason: v.reason,
+      agreedSchemaVersion: v.agreedSchemaVersion,
+      sdkVersion: v.sdkVersion,
+    };
+  }
 
   if (v.kind === 'legalActionsRequest') {
     if (typeof v.requestId !== 'string' || typeof v.entityId !== 'string') return null;

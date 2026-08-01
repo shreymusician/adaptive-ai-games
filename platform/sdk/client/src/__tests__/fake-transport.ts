@@ -1,3 +1,4 @@
+import { SDK_MESSAGE_CHANNEL, SDK_VERSION } from '@adaptive-ai/sdk-protocol';
 import { MessageTransport } from '../transport';
 
 /**
@@ -28,5 +29,19 @@ export class FakeMessageTransport implements MessageTransport {
 
   get listenerCount(): number {
     return this.handlers.length;
+  }
+
+  /**
+   * Helper for tests: complete the handshake by responding to the client's
+   * greeting with a host greeting, accepting the connection.
+   */
+  simulateHandshakeAccepted(): void {
+    this.simulateIncoming({
+      channel: SDK_MESSAGE_CHANNEL,
+      kind: 'hostGreeting',
+      accepted: true,
+      sdkVersion: SDK_VERSION,
+      agreedSchemaVersion: '1',
+    });
   }
 }

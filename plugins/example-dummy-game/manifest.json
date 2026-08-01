@@ -1,0 +1,15 @@
+{
+  "id": "example-dummy-game",
+  "displayName": "Example Dummy Game",
+  "version": "0.1.0",
+  "upstreamVersion": "n/a",
+  "entryUrl": "https://example.com/game.html",
+  "eventSchemaVersion": "1",
+  "supportsAIOpponent": true,
+  "legalActionSpace": "dummy-game-actions-v1",
+  "license": {
+    "spdxId": "MIT",
+    "noticeUrl": "https://raw.githubusercontent.com/anthropics/adaptive-ai-games/main/LICENSE",
+    "upstreamRepo": "https://github.com/anthropics/adaptive-ai-games"
+  }
+}
