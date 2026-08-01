@@ -137,10 +137,18 @@ export function requireMatchToken(config: EventPipelineConfig, logger: Logger, m
   };
 }
 
-const SCOPE_RANK: Record<TokenScope, number> = { ingest: 1, replay: 2, admin: 3 };
-
+/**
+ * Scope satisfaction is deliberately NOT a simple numeric hierarchy: 'ingest'
+ * (write access to submit events for one's own match) and 'replay' (read
+ * access to query events) are orthogonal permissions, not degrees of the
+ * same one — a token minted for a plugin to submit events must never be
+ * usable to read another match's history, and a token minted for the
+ * dashboard to read history must never be usable to inject events. Only
+ * 'admin' is a superset of both.
+ */
 function scopeSatisfies(have: TokenScope, need: TokenScope): boolean {
-  return SCOPE_RANK[have] >= SCOPE_RANK[need];
+  if (have === 'admin') return true;
+  return have === need;
 }
 
 /** Authorization check: does this token permit reading events for `matchId`? */
