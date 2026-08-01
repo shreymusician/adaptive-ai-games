@@ -5,12 +5,36 @@ import { StoredEvent } from './types';
 
 /** Manages event persistence and retrieval */
 export class EventStore {
+  private db: Db;
   private events: Collection<StoredEvent>;
   private batches: Collection;
 
   constructor(db: Db) {
+    this.db = db;
     this.events = db.collection<StoredEvent>('gameplayEvents');
     this.batches = db.collection('eventBatches');
+  }
+
+  /** Pings the database and returns round-trip latency in ms. Throws if unreachable. */
+  async ping(): Promise<number> {
+    const start = Date.now();
+    await this.db.command({ ping: 1 });
+    return Date.now() - start;
+  }
+
+  /** Total events ever stored — used for /health reporting, not a hot path. */
+  async getTotalEventCount(): Promise<number> {
+    return this.events.estimatedDocumentCount();
+  }
+
+  /** Total batches ever recorded — used for /health reporting. */
+  async getTotalBatchCount(): Promise<number> {
+    return this.batches.estimatedDocumentCount();
+  }
+
+  /** Most recently persisted event across all matches, for /health "last event" reporting. */
+  async getMostRecentEvent(): Promise<StoredEvent | null> {
+    return this.events.findOne({}, { sort: { serverTs: -1 } });
   }
 
   /** Initializes indexes for optimal query performance */
@@ -127,6 +151,18 @@ export class EventStore {
   async isDuplicate(matchId: string, seq: number): Promise<boolean> {
     const existing = await this.events.findOne({ matchId, seq });
     return existing !== null;
+  }
+
+  /**
+   * Batch duplicate check: returns the subset of `seqs` that already exist
+   * for `matchId`, in a single query. Used by EventProcessor instead of one
+   * isDuplicate() round trip per event, which does not scale to
+   * 1000-event batches.
+   */
+  async getExistingSeqs(matchId: string, seqs: number[]): Promise<Set<number>> {
+    if (seqs.length === 0) return new Set();
+    const docs = await this.events.find({ matchId, seq: { $in: seqs } }, { projection: { seq: 1 } }).toArray();
+    return new Set(docs.map((d) => d.seq));
   }
 
   /** Gets last sequence number for a match */
