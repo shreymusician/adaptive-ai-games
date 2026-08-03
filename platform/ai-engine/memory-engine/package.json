@@ -2,11 +2,22 @@
   "name": "@adaptive-ai/memory-engine",
   "version": "0.0.0",
   "private": true,
-  "description": "Adaptive AI Engine — memory-engine module",
+  "description": "Adaptive AI Engine — Memory Engine: storage, retrieval, and retention for everything the platform knows about a player. No intelligence lives here.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run --root ."
+    "test": "vitest run --root .",
+    "test:watch": "vitest --root ."
+  },
+  "dependencies": {
+    "mongodb": "^6.0.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.1.10"
   }
 }

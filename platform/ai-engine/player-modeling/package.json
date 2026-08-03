@@ -2,11 +2,20 @@
   "name": "@adaptive-ai/player-modeling",
   "version": "0.0.0",
   "private": true,
-  "description": "Adaptive AI Engine — player-modeling module",
+  "description": "Adaptive AI Engine — Player Modeling: turns match history into an evolving behavioral model of every player. Answers only \"what kind of player is this\" — never \"what should the AI do\".",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run --root ."
+    "test": "vitest run --root .",
+    "test:watch": "vitest --root ."
+  },
+  "dependencies": {
+    "@adaptive-ai/memory-engine": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.1.10"
   }
 }
