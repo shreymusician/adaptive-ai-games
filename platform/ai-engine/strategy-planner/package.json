@@ -2,11 +2,17 @@
   "name": "@adaptive-ai/strategy-planner",
   "version": "0.0.0",
   "private": true,
-  "description": "Adaptive AI Engine — strategy-planner module",
+  "description": "Adaptive AI Engine — Strategy Planner: answers only \"what objective should the AI pursue next\", via a Goal Registry + bounded GOAP over an abstract goal space. Never selects gameplay actions, never touches plugins, never mutates game state — produces StrategicIntent only.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run --root ."
+    "test": "vitest run --root .",
+    "test:watch": "vitest --root ."
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.1.10"
   }
 }

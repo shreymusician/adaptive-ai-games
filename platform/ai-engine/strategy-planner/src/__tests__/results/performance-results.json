@@ -1,0 +1,39 @@
+[
+  {
+    "scenario": "randomized-planning-1000-iterations",
+    "iterations": 1000,
+    "totalDurationMs": 690,
+    "avgDurationMs": 0.69,
+    "distinctGoalsChosen": 13,
+    "goalDistribution": {
+      "scoutUnknownBehavior": 88,
+      "retreat": 323,
+      "protectObjective": 132,
+      "breakPredictablePattern": 9,
+      "delayEngagement": 412,
+      "forceReload": 1,
+      "denyResources": 3,
+      "pressurePlayer": 11,
+      "regroup": 14,
+      "forceMovement": 3,
+      "createAmbush": 1,
+      "controlSpace": 2,
+      "splitTargets": 1
+    }
+  },
+  {
+    "scenario": "cold-planning-latency-200-calls",
+    "avgMs": 0.49,
+    "maxMs": 4
+  },
+  {
+    "scenario": "cache-hit-vs-cold",
+    "coldMs": 1,
+    "warmMs": 0
+  },
+  {
+    "scenario": "500-distinct-matches",
+    "elapsedMs": 259,
+    "perMatchMs": 0.518
+  }
+]

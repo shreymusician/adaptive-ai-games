@@ -1,6 +1,6 @@
 import { Router, Response, NextFunction, json } from 'express';
 import { EventStore } from './event-store';
-import { EventProcessor } from './event-processor';
+import { EventBatchProcessor } from './event-processor';
 import { EventPipelineConfig } from './config';
 import { Logger } from './logger';
 import { MetricsRegistry } from './metrics';
@@ -11,7 +11,8 @@ import { isPipelineError, PayloadTooLargeError, ValidationFailedError } from './
 
 export interface RouterDeps {
   store: EventStore;
-  processor: EventProcessor;
+  /** Accepts the concrete EventProcessor or any structurally-compatible coordinating wrapper — see EventBatchProcessor's doc comment. */
+  processor: EventBatchProcessor;
   config: EventPipelineConfig;
   logger: Logger;
   metrics: MetricsRegistry;

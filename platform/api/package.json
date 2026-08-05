@@ -14,17 +14,25 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@types/express": "^5.0.6",
+    "@adaptive-ai/event-pipeline": "*",
+    "@adaptive-ai/memory-engine": "*",
+    "@adaptive-ai/orchestration": "*",
+    "@adaptive-ai/pattern-recognition": "*",
+    "@adaptive-ai/player-modeling": "*",
+    "@adaptive-ai/sdk-protocol": "*",
+    "@types/express": "^4.17.25",
     "@types/node": "^26.1.2",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
+    "express": "^4.22.2",
     "google-auth-library": "^11.0.0",
     "jsonwebtoken": "^9.0.3",
+    "mongodb": "^6.0.0",
     "mongoose": "^9.9.0",
     "ts-node": "^10.9.2",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

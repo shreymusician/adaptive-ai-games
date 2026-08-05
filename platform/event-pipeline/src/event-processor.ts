@@ -7,8 +7,22 @@ import { Logger } from './logger';
 import { MetricsRegistry } from './metrics';
 import { v4 as uuidv4 } from 'uuid';
 
+/**
+ * Structural contract for anything that can process an event batch the way
+ * `EventProcessor` does. `createEventPipelineRouter` depends on this
+ * interface rather than the concrete class so a coordinating wrapper (e.g.
+ * `@adaptive-ai/orchestration`'s `OrchestratingEventProcessor`, which feeds
+ * accepted events into Memory Engine and triggers the MatchEnded workflow)
+ * can be injected in its place with zero changes to routing, auth, rate
+ * limiting, or validation. `EventProcessor` itself satisfies this interface
+ * structurally — no change to its own behavior.
+ */
+export interface EventBatchProcessor {
+  processBatch(batchData: unknown, matchId: string, playerId: string, gameId: string, schemaVersion: string): Promise<EventBatchResult>;
+}
+
 /** Processes a batch of events through the pipeline: validate, dedupe, order, persist. */
-export class EventProcessor {
+export class EventProcessor implements EventBatchProcessor {
   constructor(
     private store: EventStore,
     private config: EventPipelineConfig,

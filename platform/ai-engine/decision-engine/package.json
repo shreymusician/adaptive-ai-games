@@ -2,11 +2,21 @@
   "name": "@adaptive-ai/decision-engine",
   "version": "0.0.0",
   "private": true,
-  "description": "Adaptive AI Engine — decision-engine module",
+  "description": "Adaptive AI Engine — Decision Engine: translates StrategicIntent into a legal gameplay action via Utility AI (a Consideration Registry + weighted-sum scoring over the plugin's own getLegalActions() output). Never invents actions, never bypasses the SDK, never mutates game state.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc -b",
-    "test": "vitest run --root ."
+    "test": "vitest run --root .",
+    "test:watch": "vitest --root ."
+  },
+  "dependencies": {
+    "@adaptive-ai/sdk-protocol": "*",
+    "@adaptive-ai/strategy-planner": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.1.10"
   }
 }

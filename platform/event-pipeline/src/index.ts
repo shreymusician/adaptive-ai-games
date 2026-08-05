@@ -1,5 +1,6 @@
 export { EventStore } from './event-store';
 export { EventProcessor } from './event-processor';
+export type { EventBatchProcessor } from './event-processor';
 export { validateEvent, validateBatch, validateSequencing } from './validation';
 export { EventPipeline } from './pipeline';
 export type { EventPipelineOptions } from './pipeline';
