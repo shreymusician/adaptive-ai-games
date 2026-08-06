@@ -10,7 +10,8 @@
     "platform/event-pipeline",
     "platform/player-intelligence",
     "platform/ai-engine/*",
-    "plugins/*"
+    "plugins/*",
+    "plugins/*/adapter"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
