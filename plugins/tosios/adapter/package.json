@@ -1,0 +1,26 @@
+{
+  "name": "@adaptive-ai/tosios-adapter",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Adaptive AI Engine — TOSIOS Plugin Adapter (Phase 10A): translates the vendored, unmodified TOSIOS Colyseus server's real state changes into canonical platform events, and translates Decision Engine Actions into TOSIOS's own existing input path (state.playerPushAction) — the same path human client input takes. Contains no AI logic.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build:vendor": "node scripts/build-vendor.js",
+    "build": "npm run build:vendor && tsc -b",
+    "test": "npm run build:vendor && vitest run --root .",
+    "test:watch": "npm run build:vendor && vitest --root ."
+  },
+  "dependencies": {
+    "@adaptive-ai/sdk-protocol": "*",
+    "colyseus": "^0.14.2",
+    "@colyseus/schema": "^1.0.3",
+    "rbush": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/rbush": "^3.0.0",
+    "typescript": "^7.0.0",
+    "vitest": "^4.1.10"
+  }
+}
