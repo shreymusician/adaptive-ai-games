@@ -3,7 +3,7 @@
     "target": "es2019",
     "module": "commonjs",
     "lib": ["ES2019"],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "experimentalDecorators": true,
     "resolveJsonModule": true,
@@ -11,9 +11,8 @@
     "sourceMap": false,
     "outDir": "./vendor-dist",
     "rootDir": "../upstream/packages",
-    "baseUrl": "../upstream/packages",
     "paths": {
-      "@tosios/common": ["common/src"]
+      "@tosios/common": ["../upstream/packages/common/src"]
     },
     "skipLibCheck": true,
     "strict": false,
