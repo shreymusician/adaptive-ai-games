@@ -22,6 +22,7 @@
  */
 import { Client } from 'colyseus';
 import { GameRoom } from '../vendor-dist/server/src/rooms/GameRoom';
+import { GameState } from '../vendor-dist/server/src/states/GameState';
 import { Models, Types } from '../vendor-dist/common/src';
 import { Constants } from '../vendor-dist/common/src';
 import { TosiosEventDeriver } from './event-deriver';
@@ -31,17 +32,28 @@ import { captureSnapshot } from './snapshot';
 export interface AdaptedGameRoomHooks {
   /** Called with every canonical event this adapter derives, in emission order, already batched per tick/message. Never called synchronously from within a TOSIOS state mutation — always after `state.update()` or `state.playerXxx(...)` has fully returned, so the emitted event always describes a state that has already, actually happened. */
   onEvents(events: TosiosCanonicalEvent[]): void;
+  /**
+   * Phase 10B — optional. Called once per tick, awaited, immediately BEFORE
+   * `state.update()` runs — the only point at which an AI decision can be
+   * pushed into TOSIOS's real action queue (`state.playerPushAction`, via
+   * the Decision Adapter, exactly as a human client's input would arrive)
+   * so it's actually applied by THIS tick's `updatePlayers()`, not the next
+   * one. Never called synchronously from within a state mutation itself —
+   * always before `state.update()` starts, so it only ever reads state left
+   * over from the previous, already-completed tick. Omit for a room that
+   * doesn't drive any AI player (default no-op).
+   */
+  beforeTick?(state: GameState, now: number): void | Promise<void>;
 }
 
 /**
  * NOTE on wiring `hooks`: Colyseus instantiates Room subclasses itself
  * (`server.define(name, RoomClass)`), so this class can't take constructor
  * arguments the way a normal class would. `hooks` must be assigned onto the
- * instance before `onCreate` runs — see this package's README "Wiring
- * AdaptedGameRoom into a live server" for the two supported ways to do
- * that (a `RoomClass` factory closure, or Colyseus's own `room.listing`
- * metadata pattern), deferred to Phase 10B along with the rest of live
- * wiring (out of scope for Phase 10A per the mission brief).
+ * instance before `onCreate` runs — see `scripts/live-server.js` for the
+ * pattern used (a `RoomClass` subclass whose own `onCreate` assigns `hooks`
+ * before calling `super.onCreate(...)`) — the "RoomClass factory closure"
+ * approach this file's own comment previously named as one of two options.
  */
 export class AdaptedGameRoom extends GameRoom {
   hooks: AdaptedGameRoomHooks = { onEvents: () => {} };
@@ -61,7 +73,27 @@ export class AdaptedGameRoom extends GameRoom {
   // exact, byte-for-byte replication of GameRoom's own one-line original
   // (`this.state.update()`) plus the adapter's own diffing — never a
   // reimplementation of any GAMEPLAY logic, only sequencing.
-  handleTick = (): void => {
+  //
+  // Async since Phase 10B's `beforeTick` hook needs to `await` real (if
+  // fast, in-memory) reads before pushing an action. Colyseus's own
+  // `setSimulationInterval(() => this.handleTick())` never awaits this
+  // return value — it just invokes the function once per tick — so this
+  // does not change Colyseus's own tick cadence; it only guarantees that,
+  // WITHIN one call, `beforeTick` fully completes before `state.update()`
+  // starts, which is the actual ordering guarantee that matters.
+  handleTick = async (): Promise<void> => {
+    if (this.hooks.beforeTick) {
+      try {
+        await this.hooks.beforeTick(this.state, Date.now());
+      } catch (err) {
+        // A failing AI decision must never take down the real, live match
+        // for every other (possibly human) player in the room — TOSIOS's
+        // own simulation proceeds exactly as if the AI had done nothing
+        // this tick, same as a human whose input silently dropped.
+        // eslint-disable-next-line no-console
+        console.error('[AdaptedGameRoom] beforeTick hook failed — continuing without it this tick', err);
+      }
+    }
     this.state.update(); // exact original body of GameRoom's own handleTick
     const events = this.deriver.diffTick(captureSnapshot(this.state, Date.now()));
     if (events.length > 0) this.hooks.onEvents(events);

@@ -9,13 +9,23 @@
     "build:vendor": "node scripts/build-vendor.js",
     "build": "npm run build:vendor && tsc -b",
     "test": "npm run build:vendor && vitest run --root .",
-    "test:watch": "npm run build:vendor && vitest --root ."
+    "test:watch": "npm run build:vendor && vitest --root .",
+    "live-server": "node scripts/live-server.js"
   },
   "dependencies": {
     "@adaptive-ai/sdk-protocol": "*",
+    "@adaptive-ai/orchestration": "*",
+    "@adaptive-ai/memory-engine": "*",
+    "@adaptive-ai/player-modeling": "*",
+    "@adaptive-ai/pattern-recognition": "*",
+    "@adaptive-ai/strategy-planner": "*",
+    "@adaptive-ai/decision-engine": "*",
+    "@adaptive-ai/explainability": "*",
     "colyseus": "^0.14.2",
     "@colyseus/schema": "^1.0.3",
-    "rbush": "^3.0.1"
+    "mongodb": "^6.0.0",
+    "rbush": "^3.0.1",
+    "express": "^4.22.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

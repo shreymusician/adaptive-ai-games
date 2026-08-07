@@ -26,3 +26,9 @@ export type { AppliedAction } from './decision-adapter';
 
 export { AdaptedGameRoom } from './adapted-game-room';
 export type { AdaptedGameRoomHooks } from './adapted-game-room';
+
+export { LiveMatchRunner } from './live-match-runner';
+export type { LiveMatchRunnerOptions } from './live-match-runner';
+
+export { LiveRoomAIController } from './live-room-controller';
+export type { LiveRoomAIControllerOptions } from './live-room-controller';

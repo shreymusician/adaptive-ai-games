@@ -2,8 +2,8 @@
   {
     "scenario": "randomized-planning-1000-iterations",
     "iterations": 1000,
-    "totalDurationMs": 538,
-    "avgDurationMs": 0.538,
+    "totalDurationMs": 376,
+    "avgDurationMs": 0.376,
     "distinctGoalsChosen": 12,
     "goalDistribution": {
       "scoutUnknownBehavior": 94,
@@ -15,24 +15,24 @@
       "denyResources": 3,
       "pressurePlayer": 8,
       "regroup": 14,
-      "controlSpace": 2,
       "createAmbush": 1,
+      "controlSpace": 2,
       "splitTargets": 1
     }
   },
   {
     "scenario": "cold-planning-latency-200-calls",
-    "avgMs": 0.3,
+    "avgMs": 0.2,
     "maxMs": 2
   },
   {
     "scenario": "cache-hit-vs-cold",
-    "coldMs": 0,
-    "warmMs": 1
+    "coldMs": 1,
+    "warmMs": 0
   },
   {
     "scenario": "500-distinct-matches",
-    "elapsedMs": 173,
-    "perMatchMs": 0.346
+    "elapsedMs": 101,
+    "perMatchMs": 0.202
   }
 ]
