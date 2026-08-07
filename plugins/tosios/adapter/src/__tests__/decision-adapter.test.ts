@@ -107,8 +107,11 @@ describe('applyDecision — calls ONLY the real, public playerPushAction, never 
     handle.state.players.get(p2)!.setPosition(300, 100);
     const before = Math.hypot(300 - 100, 0);
 
-    applyDecision(handle.state, p1, { id: 'move:towardNearestOpponent' }, 0);
-    handle.state.update();
+    // PLAYER_SPEED is 1px/tick — a real client sends its held-direction move action every frame, so mirror that by repeatedly applying the decision, exactly like a human continuously moving toward a target rather than a single tap.
+    for (let i = 0; i < 20; i++) {
+      applyDecision(handle.state, p1, { id: 'move:towardNearestOpponent' }, i);
+      handle.state.update();
+    }
 
     const after = Math.hypot(handle.state.players.get(p2)!.x - handle.state.players.get(p1)!.x, handle.state.players.get(p2)!.y - handle.state.players.get(p1)!.y);
     expect(after).toBeLessThan(before);

@@ -15,4 +15,6 @@ plugins/<plugin-id>/
 
 ## Status
 
-Empty. Per `PLATFORM_V2_DESIGN.md`'s development milestones and the approved implementation order, the first plugin (`tosios`) is integrated in Phase 10, only after the Plugin SDK, Event Pipeline, Memory Engine, Player Modeling, Pattern Recognition, Strategy Planner, Decision Engine, and Explainability have each independently passed testing.
+**Phase 10A complete for `tosios`** — the real TOSIOS repository is vendored (`plugins/tosios/upstream/`, unmodified, see its `PROVENANCE.md`), and the Plugin Adapter + Decision Adapter are built and tested (`plugins/tosios/adapter/`, 42/42 tests passing against real TOSIOS game logic, zero upstream modifications). See `plugins/tosios/PHASE_10A_REPORT.md` for the full architecture analysis, event/action mapping tables, and known findings.
+
+**Not yet done (Phase 10B):** connecting the adapter to a live Colyseus server, wiring it through the Event Pipeline/AI Orchestration/Decision Engine end-to-end, and running actual matches to observe adaptation. The Phase 10A report's §6 documents one genuine architectural finding (the SDK's per-plugin-mount model assumes one player per mount; TOSIOS is one room with many players) that needs resolving before that wiring can start.
