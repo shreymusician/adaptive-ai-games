@@ -32,3 +32,6 @@ export type { LiveMatchRunnerOptions } from './live-match-runner';
 
 export { LiveRoomAIController } from './live-room-controller';
 export type { LiveRoomAIControllerOptions } from './live-room-controller';
+
+export { resolveMongoConfig, connectRealDb } from './db';
+export type { MongoConfig, RealDbConnection } from './db';

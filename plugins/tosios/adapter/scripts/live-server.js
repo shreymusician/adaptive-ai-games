@@ -19,12 +19,13 @@
  *      `waiting -> lobby -> game` transition (needs >1 player) without any
  *      change to TOSIOS's own match-lifecycle logic.
  *
- * Persistence: an in-memory FakeDb, NOT real MongoDB — explicitly out of
- * scope for this first playable pass (see this session's own instructions).
- * Every AI decision is still real (real StrategyPlanner/DecisionEngine
- * calls, real Memory Engine reads/writes) — only the backing store is a
- * fake, in-process implementation of the same Db interface.
+ * Persistence: real MongoDB (Milestone 1b), the same database platform/api
+ * uses (MONGODB_URI / MONGODB_DB_NAME, loaded from this package's own
+ * .env — see .env.example). AI learning generated during a real browser
+ * match now survives match completion, server restart, and browser
+ * refresh, exactly like the rest of the platform's persistence.
  *
+
  * Known limitation of this minimal wiring: the AI controller stops acting
  * once the FIRST match in a room ends (`MatchEnded` sets its `ended` flag).
  * TOSIOS itself loops a room back to `lobby` and starts additional matches
@@ -38,6 +39,8 @@
  */
 'use strict';
 
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
+
 const path = require('path');
 const express = require('express');
 const { createServer } = require('http');
@@ -46,9 +49,9 @@ const { Server } = require('colyseus');
 const { Constants } = require('../vendor-dist/common/src');
 const { AdaptedGameRoom } = require('../dist/index.js');
 const { LiveRoomAIController } = require('../dist/index.js');
+const { connectRealDb } = require('../dist/index.js');
 const { OrchestrationStack } = require('@adaptive-ai/orchestration');
 const { ExplanationStore, ExplainabilityEngine } = require('@adaptive-ai/explainability');
-const { FakeDb } = require('./fake-mongo.js');
 
 const PORT = Number(process.env.PORT || Constants.WS_PORT); // 3001 by default — matches the client's own dev-mode connection target, see plugins/tosios/upstream/packages/client's Home.tsx/Game.tsx
 const GAME_ID = 'tosios';
@@ -57,10 +60,10 @@ const AI_BOT_NAME = 'Adaptive AI';
 const PUBLIC_DIR = path.join(__dirname, '../../upstream/packages/client/public');
 
 async function main() {
-  // --- Real AI stack, shared across every room this process hosts (same
-  // pattern as run-live-match.js — see PHASE_10B_REPORT.md §5 for why
-  // FakeDb, not real MongoDB, backs this for the first local playtest). ---
-  const db = new FakeDb();
+  // --- Real AI stack, shared across every room this process hosts, backed
+  // by the same real MongoDB database platform/api uses (Milestone 1b). ---
+  const { db, client: mongoClient } = await connectRealDb();
+  console.log('[live-server] connected to MongoDB');
   const stack = new OrchestrationStack({ db });
   await stack.initialize();
   const explanationStore = new ExplanationStore(db);
@@ -123,6 +126,17 @@ async function main() {
     console.log(`[live-server] Adaptive AI + TOSIOS listening on http://localhost:${PORT}`);
     console.log(`[live-server] Open that URL in a browser, enter a name, create/join a room, and wait for "${AI_BOT_NAME}" to be added automatically.`);
   });
+
+  const shutdown = async (signal) => {
+    console.log(`[live-server] ${signal} received, closing MongoDB connection`);
+    try {
+      await mongoClient.close();
+    } finally {
+      process.exit(0);
+    }
+  };
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
 }
 
 main().catch((err) => {

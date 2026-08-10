@@ -23,6 +23,7 @@
     "@adaptive-ai/explainability": "*",
     "colyseus": "^0.14.2",
     "@colyseus/schema": "^1.0.3",
+    "dotenv": "^17.4.2",
     "mongodb": "^6.0.0",
     "rbush": "^3.0.1",
     "express": "^4.22.2"
