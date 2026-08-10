@@ -4,8 +4,8 @@
     "eventCount": 100,
     "ingestElapsedMs": 1,
     "ingestPerEventMs": 0.01,
-    "completeElapsedMs": 13,
-    "totalElapsedMs": 14,
+    "completeElapsedMs": 15,
+    "totalElapsedMs": 16,
     "status": "complete",
     "dimensionsUpdated": 9,
     "patternsUpdated": 9
@@ -15,8 +15,8 @@
     "eventCount": 500,
     "ingestElapsedMs": 0,
     "ingestPerEventMs": 0,
-    "completeElapsedMs": 4,
-    "totalElapsedMs": 4,
+    "completeElapsedMs": 5,
+    "totalElapsedMs": 5,
     "status": "complete",
     "dimensionsUpdated": 9,
     "patternsUpdated": 9
@@ -26,8 +26,8 @@
     "eventCount": 1000,
     "ingestElapsedMs": 1,
     "ingestPerEventMs": 0.001,
-    "completeElapsedMs": 3,
-    "totalElapsedMs": 4,
+    "completeElapsedMs": 5,
+    "totalElapsedMs": 6,
     "status": "complete",
     "dimensionsUpdated": 9,
     "patternsUpdated": 9
@@ -36,16 +36,16 @@
     "scenario": "concurrent-matches",
     "matchCount": 25,
     "eventsPerMatch": 20,
-    "elapsedMs": 35,
-    "perMatchMs": 1.4,
+    "elapsedMs": 38,
+    "perMatchMs": 1.52,
     "allComplete": true
   },
   {
     "scenario": "sequential-match-memory-growth",
     "matchesToRun": 50,
     "eventsPerMatch": 50,
-    "heapDeltaMb": 12.75,
-    "perMatchKb": 261.05,
+    "heapDeltaMb": 12.73,
+    "perMatchKb": 260.67,
     "note": "Node heap measurement without --expose-gc is noisy (no forced GC before the \"after\" reading) — informational, not a tight bound. Working Memory is destroyed and Short-Term Memory's in-process copy is deleted on every commitMatch(), so no per-match accumulator should survive past completeMatch()."
   },
   {
