@@ -8,6 +8,7 @@ import healthRoutes from './routes/health';
 import authRoutes from './routes/auth';
 import memoryRoutes from './routes/memory';
 import matchRoutes from './routes/match';
+import dashboardGuardRoutes from './routes/dashboardGuard';
 import { initAIStack } from './ai/bootstrap';
 
 const app = express();
@@ -35,6 +36,11 @@ connectDB().then(async () => {
   // index creation.
   const aiStack = await initAIStack();
   app.use('/api', aiStack.eventRouter);
+  // Authorization gate — must be mounted before dashboardRouter so an
+  // unauthorized request never reaches AI Engine code. See
+  // routes/dashboardGuard.ts for why this is a separate file rather than
+  // a change to @adaptive-ai/orchestration itself.
+  app.use('/api', dashboardGuardRoutes);
   app.use('/api', aiStack.dashboardRouter);
 
   app.listen(PORT, () => {
