@@ -72,12 +72,26 @@ async function main() {
 
   class LiveAdaptedGameRoom extends AdaptedGameRoom {
     onCreate(options) {
+      // Verifies each connecting client's platform match token before
+      // trusting any claimed identity (Milestone 1c) — see
+      // AdaptedGameRoom.onAuth. Assigned before super.onCreate(), same
+      // wiring pattern as `hooks` below.
+      this.auth = {
+        verify: (token) => stack.verifyMatchToken(token),
+        gameId: GAME_ID,
+      };
+
       const controller = new LiveRoomAIController(this.roomId, {
         stack,
         explainability,
         gameId: GAME_ID,
         aiPlayerIds: new Set([AI_BOT_ID]),
         personality: 'aggressive',
+        // Durable AI identity = verified platform playerId (from the match
+        // token), never the raw Colyseus sessionId — falls back to the
+        // legacy sessionId-based identity only for the server-injected AI
+        // bot, which never goes through onAuth.
+        resolveIdentity: (sessionId) => this.resolvePlatformIdentity(sessionId),
       });
       this._aiController = controller;
 

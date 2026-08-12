@@ -7,6 +7,8 @@ export type WallCollisionType = 'full' | 'none';
  */
 export interface PlayerOptions {
     playerName?: string;
+    /** Platform-issued, short-lived, HMAC-signed match token (see POST /api/match/start). Verified server-side before any platform playerId is trusted — never trust this field's contents client-side. */
+    matchToken?: string;
 }
 /**
  * Represent the initial parameters of a Room
@@ -17,4 +19,6 @@ export interface RoomOptions {
     roomMap: string;
     roomMaxPlayers: number;
     mode: GameMode;
+    /** Platform-issued, short-lived, HMAC-signed match token (see POST /api/match/start). Verified server-side before any platform playerId is trusted — never trust this field's contents client-side. */
+    matchToken?: string;
 }

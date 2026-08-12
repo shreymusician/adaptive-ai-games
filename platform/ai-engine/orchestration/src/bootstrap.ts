@@ -23,6 +23,8 @@ import {
   createEventPipelineRouter,
   MetricsRegistry,
   mintMatchToken,
+  verifyMatchToken,
+  MatchTokenClaims,
   TokenScope,
   rootLogger as eventPipelineRootLogger,
 } from '@adaptive-ai/event-pipeline';
@@ -156,5 +158,10 @@ export class OrchestrationStack {
   /** Convenience for minting a match-scoped ingestion token — normally called by platform/api's match-start flow, right after MemoryEngine.startMatch(). */
   mintMatchToken(claims: { matchId: string; playerId: string; gameId: string; scope: TokenScope }, ttlSeconds?: number): string {
     return mintMatchToken(claims, this.eventPipelineConfig, ttlSeconds);
+  }
+
+  /** Convenience for verifying a match-scoped token — normally called by a plugin's live game server (e.g. TOSIOS's `AdaptedGameRoom.onAuth`) before trusting any client-declared identity. Throws on any invalid/expired/tampered token. */
+  verifyMatchToken(token: string): MatchTokenClaims {
+    return verifyMatchToken(token, this.eventPipelineConfig);
   }
 }

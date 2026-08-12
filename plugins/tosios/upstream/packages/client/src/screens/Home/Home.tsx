@@ -14,10 +14,16 @@ import { RoomsList } from './components/RoomsList';
 
 interface HomeScreenProps extends RouteComponentProps {}
 
-export function HomeScreen({ navigate }: HomeScreenProps) {
+export function HomeScreen({ navigate, location }: HomeScreenProps) {
     const [rooms, setRooms] = useState<Array<RoomAvailable<any>>>([]);
     const clientRef = useRef<Client>();
     const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Platform match token, if this page was opened with one (e.g. from the
+    // platform launcher after POST /api/match/start) — forwarded, unmodified,
+    // into whichever room the player creates or joins next. Never trusted
+    // here; only the TOSIOS server verifies it (AdaptedGameRoom.onAuth).
+    const matchToken = (qs.parse((location || {}).search || '') as Types.RoomOptions).matchToken;
 
     //
     // Lifecycle
@@ -67,13 +73,14 @@ export function HomeScreen({ navigate }: HomeScreenProps) {
             roomMap: map,
             roomMaxPlayers: maxPlayers,
             mode,
+            matchToken,
         };
 
         navigate(`/new${qs.stringify(options, true)}`);
     }
 
     function handleRoomClick(roomId: string) {
-        navigate(`/${roomId}`);
+        navigate(matchToken ? `/${roomId}${qs.stringify({ matchToken }, true)}` : `/${roomId}`);
     }
 
     return (

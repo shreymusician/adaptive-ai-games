@@ -12,6 +12,9 @@ export type { DashboardRouterDeps } from './dashboard-router';
 export { OrchestrationStack } from './bootstrap';
 export type { OrchestrationStackOptions } from './bootstrap';
 
+export { verifyMatchToken, mintMatchToken, loadConfig as loadEventPipelineConfig } from '@adaptive-ai/event-pipeline';
+export type { MatchTokenClaims, TokenScope, EventPipelineConfig } from '@adaptive-ai/event-pipeline';
+
 export { loadOrchestrationConfig } from './types';
 export type { OrchestrationConfig, MatchProcessingStatus, MatchProcessingReport, MatchCompletedEvent, StageError, IngestableEvent } from './types';
 

@@ -69,8 +69,11 @@ export function GameScreen({ navigate, location, roomId }: GameScreenProps) {
             };
         } else {
             // The only thing to pass when joining an existing room is a player's name
+            // (plus the platform match token, if one arrived via query params —
+            // forwarded unmodified; only the TOSIOS server verifies it).
             options = {
                 playerName: localStorage.getItem('playerName'),
+                matchToken: parsedSearch.matchToken,
             };
         }
 

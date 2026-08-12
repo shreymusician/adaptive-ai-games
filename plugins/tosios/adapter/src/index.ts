@@ -25,7 +25,9 @@ export { getLegalActions, applyDecision } from './decision-adapter';
 export type { AppliedAction } from './decision-adapter';
 
 export { AdaptedGameRoom } from './adapted-game-room';
-export type { AdaptedGameRoomHooks } from './adapted-game-room';
+export type { AdaptedGameRoomHooks, AdaptedGameRoomAuth, MatchTokenClaimsLike } from './adapted-game-room';
+
+export type { PlatformIdentity } from './identity';
 
 export { LiveMatchRunner } from './live-match-runner';
 export type { LiveMatchRunnerOptions } from './live-match-runner';

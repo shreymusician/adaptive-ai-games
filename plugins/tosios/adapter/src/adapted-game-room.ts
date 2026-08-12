@@ -28,6 +28,27 @@ import { Constants } from '../vendor-dist/common/src';
 import { TosiosEventDeriver } from './event-deriver';
 import { TosiosCanonicalEvent } from './event-mapping';
 import { captureSnapshot } from './snapshot';
+import { PlatformIdentity } from './identity';
+
+export interface MatchTokenClaimsLike {
+  matchId: string;
+  playerId: string;
+  gameId: string;
+  scope: string;
+}
+
+/**
+ * Verifies a platform match token and reports which gameId this room
+ * belongs to. Assigned onto the instance before `onCreate`/`onAuth` run —
+ * same wiring pattern as `hooks` (see its own doc comment). Left unset,
+ * `onAuth` falls back to Colyseus's own default (`return true`) — used only
+ * by isolated unit tests that construct `AdaptedGameRoom` directly, never by
+ * the live server (`scripts/live-server.js` always wires this).
+ */
+export interface AdaptedGameRoomAuth {
+  verify(token: string): MatchTokenClaimsLike;
+  gameId: string;
+}
 
 export interface AdaptedGameRoomHooks {
   /** Called with every canonical event this adapter derives, in emission order, already batched per tick/message. Never called synchronously from within a TOSIOS state mutation — always after `state.update()` or `state.playerXxx(...)` has fully returned, so the emitted event always describes a state that has already, actually happened. */
@@ -57,8 +78,11 @@ export interface AdaptedGameRoomHooks {
  */
 export class AdaptedGameRoom extends GameRoom {
   hooks: AdaptedGameRoomHooks = { onEvents: () => {} };
+  /** Assigned before onCreate runs, same wiring pattern as `hooks` — see `AdaptedGameRoomAuth`'s doc comment. */
+  auth?: AdaptedGameRoomAuth;
 
   private readonly deriver = new TosiosEventDeriver();
+  private readonly platformIdentityBySession = new Map<string, MatchTokenClaimsLike>();
 
   // handleTick is an ARROW-FUNCTION INSTANCE FIELD on GameRoom (`handleTick
   // = () => { this.state.update(); }`), not a prototype method — `super.
@@ -152,8 +176,57 @@ export class AdaptedGameRoom extends GameRoom {
     });
   }
 
-  onJoin(client: Client, options: Types.PlayerOptions): void {
+  /**
+   * Colyseus lifecycle hook (unused anywhere else in TOSIOS — confirmed by
+   * grep, this is the first time it's implemented). Runs BEFORE `onJoin`,
+   * for every connecting client, and can reject the connection outright by
+   * throwing. This is the enforcement point for "the server must verify the
+   * token before accepting the claimed platform identity" — no platform
+   * playerId is ever trusted from `options` directly, only from a
+   * successfully-verified token's claims.
+   *
+   * If `auth` is unset (only true for isolated unit tests that build an
+   * `AdaptedGameRoom` without wiring live identity), falls back to
+   * Colyseus's own default behavior (`return true`, no verification) so
+   * those tests keep working unmodified.
+   */
+  async onAuth(_client: Client, options: Types.RoomOptions & { matchToken?: string; matchId?: string }): Promise<MatchTokenClaimsLike | true> {
+    if (!this.auth) return true;
+
+    const token = options.matchToken;
+    if (!token || typeof token !== 'string') {
+      throw new Error('matchToken is required to join this room');
+    }
+
+    let claims: MatchTokenClaimsLike;
+    try {
+      claims = this.auth.verify(token);
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'Invalid match token');
+    }
+
+    if (claims.gameId !== this.auth.gameId) {
+      throw new Error(`Token is not valid for game '${this.auth.gameId}'`);
+    }
+    if (claims.scope !== 'ingest' && claims.scope !== 'admin') {
+      throw new Error(`Token scope '${claims.scope}' cannot join a live match`);
+    }
+    // Defense-in-depth: if the client also declared a matchId (e.g. mirrored
+    // from the same POST /api/match/start response that carried the token),
+    // it must agree with the token's own — a valid token must never be
+    // reinterpreted as authorizing a different match than it was minted for.
+    if (options.matchId && options.matchId !== claims.matchId) {
+      throw new Error('Token is not authorized for the declared matchId');
+    }
+
+    return claims;
+  }
+
+  onJoin(client: Client, options: Types.PlayerOptions, auth?: MatchTokenClaimsLike | true): void {
     super.onJoin(client, options);
+    if (auth && auth !== true) {
+      this.platformIdentityBySession.set(client.sessionId, auth);
+    }
     // No canonical equivalent for "player joined" exists in
     // CANONICAL_EVENT_TYPES (@adaptive-ai/sdk-protocol) — see report
     // "Event mappings" for the documented gap. Nothing further to emit
@@ -163,7 +236,25 @@ export class AdaptedGameRoom extends GameRoom {
 
   onLeave(client: Client): void {
     super.onLeave(client);
+    this.platformIdentityBySession.delete(client.sessionId);
     // Same as onJoin — 'left' has no canonical equivalent either.
+  }
+
+  /**
+   * Resolves the durable AI-engine identity for a Colyseus session —
+   * verified platform claims if this client presented a valid match token,
+   * otherwise the pre-1c fallback (sessionId as playerId, a room-scoped
+   * composite matchId). The fallback only ever applies to connections that
+   * never went through a verified `onAuth` — in the live server, that's
+   * exclusively the server-injected AI opponent (`state.playerAdd`, never a
+   * real Colyseus client connection).
+   */
+  resolvePlatformIdentity(sessionId: string): PlatformIdentity {
+    const claims = this.platformIdentityBySession.get(sessionId);
+    if (claims) {
+      return { playerId: claims.playerId, matchId: claims.matchId, gameId: claims.gameId };
+    }
+    return { playerId: sessionId, matchId: `${this.roomId}::${sessionId}`, gameId: this.auth?.gameId ?? '' };
   }
 
   private playerIdsByName(): Map<string, string> {
