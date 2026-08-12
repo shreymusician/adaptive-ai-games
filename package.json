@@ -16,9 +16,12 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "predev": "npm run build --workspace=plugins/tosios/adapter",
+    "dev": "concurrently -n api,web,tosios -c blue,green,magenta \"npm run dev --workspace=platform/api\" \"npm run dev --workspace=platform/web\" \"npm run live-server --workspace=plugins/tosios/adapter\""
   },
   "devDependencies": {
+    "concurrently": "^9.2.4",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
   }
