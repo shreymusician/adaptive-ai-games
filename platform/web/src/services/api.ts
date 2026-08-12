@@ -75,6 +75,19 @@ export const memoryAPI = {
     api.get(`/stats/${gameType}`).then((res) => res.data),
 };
 
+export interface StartMatchResponse {
+  matchId: string;
+  playerId: string;
+  gameId: string;
+  matchToken: string;
+}
+
+export const matchAPI = {
+  /** POST /api/match/start — mints a short-lived, HMAC-signed match token bound to the authenticated player (see platform/api/routes/match.ts). The frontend never mints or sees the signing secret; it only forwards this token, unmodified, to the game's own server for verification. */
+  start: (gameId: string): Promise<StartMatchResponse> =>
+    api.post('/match/start', { gameId }).then((res) => res.data),
+};
+
 export const healthAPI = {
   check: () => api.get('/health').then((res) => res.data),
 };
