@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
 import { WardenGame } from './pages/WardenGame';
 import { FiveGame } from './pages/FiveGame';
+import { TosiosGame } from './pages/TosiosGame';
 import './App.css';
 
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
@@ -40,6 +41,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <FiveGame />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/play/tosios"
+              element={
+                <ProtectedRoute>
+                  <TosiosGame />
                 </ProtectedRoute>
               }
             />
