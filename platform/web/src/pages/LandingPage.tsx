@@ -101,6 +101,17 @@ export const LandingPage = () => {
           )}
           <span className="play-button">Play Now</span>
         </Link>
+
+        <Link to="/play/tosios" className="game-card">
+          <div className="game-card-header">
+            <h3>ADAPTIVE AI</h3>
+            <div className="game-badge">LIVE</div>
+          </div>
+          <p className="game-description">
+            A real multiplayer arena shooter with a live AI opponent that learns your play across matches, not just within one.
+          </p>
+          <span className="play-button">Play Now</span>
+        </Link>
       </div>
 
       {(wardenStats || fiveStats) && (
