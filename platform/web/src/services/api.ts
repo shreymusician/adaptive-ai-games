@@ -88,6 +88,101 @@ export const matchAPI = {
     api.post('/match/start', { gameId }).then((res) => res.data),
 };
 
+// --- Adaptive AI Engine dashboard (read-only) ---
+// Mirrors the real response shapes from
+// platform/ai-engine/orchestration/src/dashboard-router.ts exactly — no
+// invented fields. Every call is scoped to the authenticated player's own
+// id (never a URL/query/localStorage-supplied id); the backend's
+// requireOwnPlayerId/filterMatchReportByOwner middleware (Milestone 1a)
+// remains the actual security boundary — this client can't weaken it.
+
+/** The whitepaper's `ProfileDimension` — Player Modeling's per-trait output (@adaptive-ai/memory-engine's SemanticDimensionState). */
+export interface SemanticDimensionState {
+  playerId: string;
+  gameId: string | null;
+  dimension: string;
+  value: number;
+  confidence: number;
+  samples: number;
+  version: number;
+  updatedAt: number;
+}
+
+/** @adaptive-ai/memory-engine's PlayerEpisode. */
+export interface PlayerEpisode {
+  episodeId: string;
+  playerId: string;
+  gameId: string;
+  matchId: string;
+  timestamp: number;
+  episodeType: string;
+  summary: string;
+  importance: number;
+  confidence: number;
+}
+
+/** GET /dashboard/players/:playerId/profile — @adaptive-ai/memory-engine's PlayerMemorySnapshot. */
+export interface PlayerProfileResponse {
+  playerId: string;
+  gameId: string | null;
+  semanticProfile: SemanticDimensionState[];
+  topEpisodes: PlayerEpisode[];
+  loadedAt: number;
+}
+
+/** @adaptive-ai/pattern-recognition's PatternRecord. */
+export interface PatternRecord {
+  playerId: string;
+  gameId: string;
+  patternId: string;
+  category: 'movement' | 'combat' | 'decision' | 'exploration' | 'risk';
+  description: string;
+  state: 'candidate' | 'confirmed' | 'strong' | 'weakening' | 'retired';
+  observationCount: number;
+  confidence: number;
+  lastObservedAt: number;
+}
+
+/** GET /dashboard/players/:playerId/patterns */
+export interface PatternsResponse {
+  playerId: string;
+  gameId: string;
+  patternCount: number;
+  total: number;
+  patterns: PatternRecord[];
+}
+
+/** @adaptive-ai/orchestration's MatchProcessingReport (subset actually used here). */
+export interface MatchProcessingReport {
+  reportId: string;
+  matchId: string;
+  playerId: string;
+  gameId: string;
+  status: 'complete' | 'partial' | 'failed';
+  startedAt: number;
+  completedAt: number;
+  durationMs: number;
+  eventCount: number;
+}
+
+/** GET /dashboard/players/:playerId/reports — sorted most-recent-first by the backend. */
+export interface ReportsResponse {
+  playerId: string;
+  reportCount: number;
+  reports: MatchProcessingReport[];
+}
+
+export const dashboardAPI = {
+  getProfile: (playerId: string, gameId: string): Promise<PlayerProfileResponse> =>
+    api.get(`/dashboard/players/${playerId}/profile`, { params: { gameId } }).then((res) => res.data),
+
+  getPatterns: (playerId: string, gameId: string): Promise<PatternsResponse> =>
+    api.get(`/dashboard/players/${playerId}/patterns`, { params: { gameId, limit: 8, sortBy: 'confidence' } }).then((res) => res.data),
+
+  getReports: (playerId: string, limit = 5): Promise<ReportsResponse> =>
+    api.get(`/dashboard/players/${playerId}/reports`, { params: { limit } }).then((res) => res.data),
+};
+
 export const healthAPI = {
   check: () => api.get('/health').then((res) => res.data),
 };
