@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { memoryAPI } from '../services/api';
+import { AdaptiveAIPanel } from '../components/AdaptiveAIPanel';
 import '../styles/LandingPage.css';
 
 interface Stats {
@@ -113,6 +114,8 @@ export const LandingPage = () => {
           <span className="play-button">Play Now</span>
         </Link>
       </div>
+
+      <AdaptiveAIPanel />
 
       {(wardenStats || fiveStats) && (
         <div className="record-section">
