@@ -2,50 +2,50 @@
   {
     "scenario": "ingest-100-events-per-sec-target",
     "totalEvents": 2000,
-    "totalMs": 261,
-    "achievedEventsPerSec": 7663,
-    "batchLatencyMsP50": 12,
-    "batchLatencyMsP95": 25,
-    "batchLatencyMsP99": 25,
-    "batchLatencyMsMax": 25
+    "totalMs": 1608,
+    "achievedEventsPerSec": 1244,
+    "batchLatencyMsP50": 71,
+    "batchLatencyMsP95": 144,
+    "batchLatencyMsP99": 144,
+    "batchLatencyMsMax": 144
   },
   {
     "scenario": "ingest-500-events-per-sec-target",
     "totalEvents": 2500,
-    "totalMs": 718,
-    "achievedEventsPerSec": 3482,
-    "batchLatencyMsP50": 28,
-    "batchLatencyMsP95": 42,
-    "batchLatencyMsP99": 51,
-    "batchLatencyMsMax": 51
+    "totalMs": 1764,
+    "achievedEventsPerSec": 1417,
+    "batchLatencyMsP50": 51,
+    "batchLatencyMsP95": 131,
+    "batchLatencyMsP99": 133,
+    "batchLatencyMsMax": 133
   },
   {
     "scenario": "ingest-1000-events-per-sec-target",
     "totalEvents": 5000,
-    "totalMs": 1435,
-    "achievedEventsPerSec": 3484,
-    "batchLatencyMsP50": 27,
-    "batchLatencyMsP95": 39,
-    "batchLatencyMsP99": 45,
-    "batchLatencyMsMax": 45
+    "totalMs": 3354,
+    "achievedEventsPerSec": 1491,
+    "batchLatencyMsP50": 43,
+    "batchLatencyMsP95": 130,
+    "batchLatencyMsP99": 145,
+    "batchLatencyMsMax": 145
   },
   {
     "scenario": "concurrent-10-matches-x-200-events",
     "totalEvents": 2000,
-    "totalMs": 911,
-    "achievedEventsPerSec": 2195
+    "totalMs": 1901,
+    "achievedEventsPerSec": 1052
   },
   {
     "scenario": "single-batch-2000-events",
-    "elapsedMs": 55
+    "elapsedMs": 123
   },
   {
     "scenario": "replay-5000-of-10000-events",
-    "elapsedMs": 135
+    "elapsedMs": 399
   },
   {
     "scenario": "heap-growth-20000-events",
-    "heapDeltaMb": -13.1,
-    "bytesPerEvent": -687
+    "heapDeltaMb": 9.96,
+    "bytesPerEvent": 522
   }
 ]
