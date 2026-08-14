@@ -25,14 +25,11 @@
  * match now survives match completion, server restart, and browser
  * refresh, exactly like the rest of the platform's persistence.
  *
-
- * Known limitation of this minimal wiring: the AI controller stops acting
- * once the FIRST match in a room ends (`MatchEnded` sets its `ended` flag).
- * TOSIOS itself loops a room back to `lobby` and starts additional matches
- * automatically if players stay — the AI simply goes idle for those,
- * rather than the room resetting the controller. Fine for "play one match
- * against the AI"; a real multi-match-per-room controller reset is future
- * work, not attempted here.
+ * Milestone 1f: `LiveRoomAIController` now survives TOSIOS looping the same
+ * room from a completed match back to `lobby` and into another `game` — the
+ * AI keeps participating in every match a room hosts, not just the first
+ * (see `live-room-controller.ts`'s `matchRound`/`handleMatchStarted` doc
+ * comments for the reset/continuity split).
  *
  * Usage: node scripts/live-server.js
  * Then open http://localhost:3001 in a browser.

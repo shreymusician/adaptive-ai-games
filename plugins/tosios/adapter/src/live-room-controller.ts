@@ -90,6 +90,25 @@ export class LiveRoomAIController {
   private readonly resolveIdentity: (sessionId: string) => { playerId: string; matchId: string };
   private seq = 0;
   private endedFlag = false;
+  /**
+   * ROOM LIFETIME != MATCH LIFETIME: a Colyseus room outlives any single
+   * TOSIOS match (`waiting -> lobby -> game -> lobby -> game -> ...`, see
+   * `Game.ts`'s real state machine, driven by `Game.startGame()` on every
+   * fresh lobby countdown). `resolveIdentity` always reports the SAME
+   * `matchId` for a given sessionId across the whole room lifetime (a
+   * platform match token is minted once, at join time, and never re-minted
+   * mid-room) — so this controller, not the token, is what must guarantee a
+   * distinct matchId per match. `matchRound` counts which match within this
+   * room this is (1 = the first); `composeMatchId` appends a suffix for the
+   * second and later matches only, leaving the first match's matchId
+   * byte-for-byte identical to `resolveIdentity`'s own output (matches
+   * every pre-1f caller/test's expectation).
+   */
+  private matchRound = 1;
+  /** True once this controller has observed its first `MatchStarted` — distinguishes "this is the very first match" (roster already built incrementally by `refreshParticipants` during the pre-match lobby, no round suffix needed) from "a later match is starting" (roster must be rebuilt fresh under a new round suffix). */
+  private hasStartedFirstMatch = false;
+  /** The most recent `GameState` seen via `beforeTick`. `onEvents` (called synchronously from within `AdaptedGameRoom`'s `state.update()`, mid-tick — see `handleMatchStarted`) has no `GameState` parameter of its own; this is always fresh by the time a `MatchStarted` event can fire, since that event is only ever derived as a direct consequence of a `state.update()` call this same `beforeTick` preceded. */
+  private lastState: GameState | null = null;
 
   decisionsMade = 0;
   eventsIngested = 0;
@@ -122,6 +141,36 @@ export class LiveRoomAIController {
     return this.opts.aiPlayerIds.has(playerId);
   }
 
+  /** First match keeps the raw resolved matchId unchanged; every later match in this room gets a round suffix so it never collides with (or gets rejected as a duplicate of) an already-completed match under the same base matchId. See `matchRound`'s doc comment. */
+  private composeMatchId(baseMatchId: string): string {
+    return this.matchRound <= 1 ? baseMatchId : `${baseMatchId}::round${this.matchRound}`;
+  }
+
+  /**
+   * Called once per `MatchStarted` event. The first one is a no-op — this
+   * match's roster was already built incrementally by `refreshParticipants`
+   * during the lobby that preceded it. Every subsequent one means TOSIOS has
+   * looped this same room back into a new match (the human stayed
+   * connected): advance `matchRound`, clear every per-match cache (roster,
+   * durable-identity lookup, cached strategic intents — see `[[1f-lifecycle
+   * reset scope]]` in this class's own state), un-terminate the controller,
+   * and rebuild the roster immediately under the new round's matchIds so the
+   * very same `MatchStarted` event this method was called for still gets
+   * ingested against the correct (new) matchId a moment later.
+   */
+  private handleMatchStarted(): void {
+    if (!this.hasStartedFirstMatch) {
+      this.hasStartedFirstMatch = true;
+      return;
+    }
+    this.matchRound += 1;
+    this.endedFlag = false;
+    this.matchIdsByPlayer.clear();
+    this.platformPlayerIdBySession.clear();
+    this.intentsByPlayer.clear();
+    if (this.lastState) this.refreshParticipants(this.lastState);
+  }
+
   /** `sessionId` is the Colyseus session this event was derived for — translated to the durable platform playerId here, at the exact boundary where identity reaches the AI engine. */
   private stamp(e: TosiosCanonicalEvent, matchId: string, sessionId: string): CanonicalEvent {
     return {
@@ -151,7 +200,7 @@ export class LiveRoomAIController {
     state.players.forEach((_player, sessionId) => {
       if (!this.matchIdsByPlayer.has(sessionId)) {
         const identity = this.resolveIdentity(sessionId);
-        this.matchIdsByPlayer.set(sessionId, identity.matchId);
+        this.matchIdsByPlayer.set(sessionId, this.composeMatchId(identity.matchId));
         this.platformPlayerIdBySession.set(sessionId, identity.playerId);
       }
     });
@@ -161,6 +210,11 @@ export class LiveRoomAIController {
   onEvents(events: TosiosCanonicalEvent[]): void {
     if (events.length === 0) return;
     for (const e of events) {
+      // Rebuild the roster under a new round's matchIds BEFORE fan-out below,
+      // so this very MatchStarted event is itself ingested against the new
+      // matchId, not the previous (possibly already-completed) one.
+      if (e.type === 'MatchStarted') this.handleMatchStarted();
+
       const targets = e.playerId === '' ? Array.from(this.matchIdsByPlayer.keys()) : [e.playerId];
       for (const sessionId of targets) {
         const matchId = this.matchIdsByPlayer.get(sessionId);
@@ -271,6 +325,7 @@ export class LiveRoomAIController {
 
   /** Called by `AdaptedGameRoom.handleTick`, awaited, immediately before `state.update()`. Refreshes the participant roster while the match hasn't started, then runs every AI player's think-act cycle. */
   async beforeTick(state: GameState, now: number): Promise<void> {
+    this.lastState = state;
     if (this.endedFlag) return;
     if (state.game.state !== 'game') this.refreshParticipants(state);
 
