@@ -21,6 +21,7 @@
     "@adaptive-ai/strategy-planner": "*",
     "@adaptive-ai/decision-engine": "*",
     "@adaptive-ai/explainability": "*",
+    "@adaptive-ai/difficulty-calibration": "*",
     "colyseus": "^0.14.2",
     "@colyseus/schema": "^1.0.3",
     "dotenv": "^17.4.2",

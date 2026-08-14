@@ -39,6 +39,7 @@ import {
 } from '@adaptive-ai/strategy-planner';
 import { DecisionEngine, DecisionRegistry, registerAllConsiderations, loadDecisionEngineConfig, DecisionInputs, Decision } from '@adaptive-ai/decision-engine';
 import { ExplainabilityEngine } from '@adaptive-ai/explainability';
+import { computeAwarenessBudget } from '@adaptive-ai/difficulty-calibration';
 
 import { GameState } from '../vendor-dist/server/src/states/GameState';
 import { Constants } from '../vendor-dist/common/src';
@@ -77,6 +78,20 @@ interface PlayerContext {
   patterns: PatternEntry[];
   episodicMemory: EpisodicMemoryEntry[];
   rawEpisodes: Awaited<ReturnType<OrchestrationStack['memoryEngine']['loadPlayerMemory']>>['topEpisodes'];
+  /**
+   * The Awareness Budget's only input (see @adaptive-ai/difficulty-calibration)
+   * — MemoryEngine.loadPlayerMemory's own `recentMatches.length`. NOTE: this
+   * is currently player-scoped ACROSS THE WHOLE PLATFORM, not filtered by
+   * gameId or by opponent (`MemoryEngine.getRecentForPlayer` queries only
+   * `{ playerId }`; `MatchMemoryRecord` has no opponent-identity field at
+   * all). It's used here as the proxy for "history against this opponent"
+   * only because TOSIOS is currently the platform's sole game and has
+   * exactly one AI opponent (`ai-bot-1`), so today the two sets of matches
+   * happen to coincide. This is a known implementation limitation, not true
+   * per-opponent history — it would need revisiting if a second game or a
+   * second AI opponent is ever added.
+   */
+  recentMatchCount: number;
 }
 
 export class LiveRoomAIController {
@@ -273,11 +288,12 @@ export class LiveRoomAIController {
       patterns: patterns.map((p) => ({ patternId: p.patternId, detectorId: p.detectorId, patternKey: p.patternKey, category: p.category, state: p.state, confidence: p.confidence, description: p.description })),
       episodicMemory: memory.topEpisodes.map((ep) => ({ episodeId: ep.episodeId, episodeType: ep.episodeType, summary: ep.summary, importance: ep.importance, confidence: ep.confidence, timestamp: ep.timestamp })),
       rawEpisodes: memory.topEpisodes,
+      recentMatchCount: memory.recentMatches.length,
     };
   }
 
   /** Cached/keyed by sessionId (session-scoped runtime cache) but `matchContext.playerId` reports the durable platform identity — descriptive metadata for Strategy Planner/Explainability, not a mechanics field. */
-  private planIfStale(sessionId: string, platformPlayerId: string, matchId: string, now: number, state: GameState, ctx: PlayerContext): StrategicIntent {
+  private planIfStale(sessionId: string, platformPlayerId: string, matchId: string, now: number, state: GameState, ctx: PlayerContext, awarenessBudget: number): StrategicIntent {
     const cached = this.intentsByPlayer.get(sessionId);
     if (cached && now < cached.validUntil) return cached;
 
@@ -287,7 +303,7 @@ export class LiveRoomAIController {
       semanticProfile: ctx.semanticProfile,
       patterns: ctx.patterns,
       episodicMemory: ctx.episodicMemory,
-      awarenessBudget: this.opts.awarenessBudget ?? 0.8,
+      awarenessBudget,
       personality: this.opts.personality ?? 'aggressive',
     };
     const intent = this.strategyPlanner.plan(inputs, now);
@@ -308,7 +324,13 @@ export class LiveRoomAIController {
     const platformPlayerId = this.platformPlayerIdBySession.get(sessionId) ?? sessionId;
 
     const ctx = await this.loadPlayerContext(platformPlayerId);
-    const intent = this.planIfStale(sessionId, platformPlayerId, matchId, now, state, ctx);
+    // Awareness Budget (whitepaper §7): rises with this player's own match
+    // history against this opponent, starting from a deliberate new-player
+    // floor — see @adaptive-ai/difficulty-calibration. An explicit
+    // opts.awarenessBudget (tests, LiveMatchRunner-style callers) still
+    // overrides the computed value.
+    const awarenessBudget = this.opts.awarenessBudget ?? computeAwarenessBudget({ recentMatchCount: ctx.recentMatchCount });
+    const intent = this.planIfStale(sessionId, platformPlayerId, matchId, now, state, ctx, awarenessBudget);
 
     const decisionInputs: DecisionInputs = {
       strategicIntent: intent,
@@ -317,7 +339,7 @@ export class LiveRoomAIController {
       publicGameState: this.buildPublicGameState(state, sessionId),
       semanticProfile: ctx.semanticProfile,
       patterns: ctx.patterns,
-      awarenessBudget: this.opts.awarenessBudget ?? 0.8,
+      awarenessBudget,
       personality: this.opts.personality ?? 'aggressive',
     };
 
