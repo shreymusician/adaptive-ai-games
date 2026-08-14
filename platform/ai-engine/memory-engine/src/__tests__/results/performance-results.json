@@ -1,22 +1,22 @@
 [
   {
     "scenario": "5000-sequential-semantic-updates",
-    "elapsedMs": 19109,
-    "perUpdateMs": 3.822
+    "elapsedMs": 3334,
+    "perUpdateMs": 0.667
   },
   {
     "scenario": "update-cost-at-depth-2500-vs-depth-0-informational",
-    "first500Ms": 358,
-    "next500AtDepth2500Ms": 2438,
+    "first500Ms": 29,
+    "next500AtDepth2500Ms": 376,
     "note": "FakeDb linear-scan artifact expected here — see test comment; real Mongo with declared indexes would not show this growth"
   },
   {
     "scenario": "2000-episodes-10-players-retention-cap-20",
-    "elapsedMs": 2114
+    "elapsedMs": 294
   },
   {
     "scenario": "500-match-commits",
-    "commitElapsedMs": 1059,
-    "recentReadElapsedMs": 5
+    "commitElapsedMs": 152,
+    "recentReadElapsedMs": 1
   }
 ]

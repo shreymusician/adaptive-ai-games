@@ -109,6 +109,20 @@ export class LiveRoomAIController {
   private hasStartedFirstMatch = false;
   /** The most recent `GameState` seen via `beforeTick`. `onEvents` (called synchronously from within `AdaptedGameRoom`'s `state.update()`, mid-tick — see `handleMatchStarted`) has no `GameState` parameter of its own; this is always fresh by the time a `MatchStarted` event can fire, since that event is only ever derived as a direct consequence of a `state.update()` call this same `beforeTick` preceded. */
   private lastState: GameState | null = null;
+  /**
+   * Coalesces concurrent `completeAll()` calls into the one already running.
+   * The real caller (`live-server.js`) re-checks `ended` and re-invokes
+   * `completeAll()` on every subsequent tick that still produces events
+   * while it's true (there is no edge-detection on its side) — without this
+   * guard, two overlapping calls can both observe
+   * `orchestrator.isCompleted(matchId) === false` before either's
+   * `commitMatch()` resolves, and both attempt to commit the same matchId
+   * (a real MongoDB duplicate-key error, reproduced live during Milestone
+   * 1f's real E2E verification). Cleared once the in-flight call settles
+   * (success OR failure), so a genuine retry after a real failure is still
+   * possible — only true concurrent duplication is prevented.
+   */
+  private completionInFlight: Promise<Map<string, { report: Awaited<ReturnType<OrchestrationStack['orchestrator']['completeMatch']>>; summary: unknown }>> | null = null;
 
   decisionsMade = 0;
   eventsIngested = 0;
@@ -334,8 +348,20 @@ export class LiveRoomAIController {
     }
   }
 
-  /** Call once the match has ended — completes every participant's match independently through MatchOrchestrator, then generates and persists an Explainability match summary for whichever participants actually had at least one recorded decision. */
+  /** Call once the match has ended — completes every participant's match independently through MatchOrchestrator, then generates and persists an Explainability match summary for whichever participants actually had at least one recorded decision. Safe to call from multiple overlapping ticks (see `completionInFlight`'s doc comment) — a call made while one is already running joins that same in-flight run instead of duplicating it. */
   async completeAll(now: number): Promise<Map<string, { report: Awaited<ReturnType<OrchestrationStack['orchestrator']['completeMatch']>>; summary: unknown }>> {
+    if (this.completionInFlight) return this.completionInFlight;
+
+    const run = this.runCompleteAll(now);
+    this.completionInFlight = run;
+    try {
+      return await run;
+    } finally {
+      if (this.completionInFlight === run) this.completionInFlight = null;
+    }
+  }
+
+  private async runCompleteAll(now: number): Promise<Map<string, { report: Awaited<ReturnType<OrchestrationStack['orchestrator']['completeMatch']>>; summary: unknown }>> {
     const results = new Map<string, { report: Awaited<ReturnType<OrchestrationStack['orchestrator']['completeMatch']>>; summary: unknown }>();
     for (const [playerId, matchId] of this.matchIdsByPlayer) {
       if (!this.opts.stack.orchestrator.isCompleted(matchId)) {
