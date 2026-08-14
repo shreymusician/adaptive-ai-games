@@ -83,6 +83,34 @@ export class AdaptedGameRoom extends GameRoom {
 
   private readonly deriver = new TosiosEventDeriver();
   private readonly platformIdentityBySession = new Map<string, MatchTokenClaimsLike>();
+  /**
+   * Milestone 1f: guards against overlapping `handleTick` invocations.
+   * Colyseus's `setSimulationInterval` fires on a fixed real-time cadence
+   * (~16ms @ 60Hz) and never awaits `handleTick`'s own return value (see
+   * this field's neighboring doc comment) — if one call's `beforeTick`
+   * await (real AI decision-making: Memory Engine reads, Strategy
+   * Planner/Decision Engine, an Explainability write, all real DB
+   * round-trips) ever takes longer than one tick interval, the NEXT
+   * interval fires anyway, starting a second, fully overlapping
+   * `handleTick` call — and so on, unboundedly, for as long as real
+   * latency exceeds the tick budget. Confirmed live during Milestone 1f's
+   * real E2E verification against a real (occasionally slow) MongoDB Atlas
+   * connection: a backlog of thousands of already-in-flight ticks captured
+   * from BEFORE a round transition can keep draining, and logging
+   * decisions under the PREVIOUS round's matchId, for a long time after
+   * TOSIOS has already moved on to the next match. Each individual
+   * decision is still attributed to a matchId that was valid at the moment
+   * that particular tick's roster snapshot was taken (no cross-match data
+   * corruption), but it starves the CURRENT match of real-time AI
+   * participation and risks a backlogged tick's event landing after its
+   * own matchId has already been marked complete. `state.update()` itself
+   * is not otherwise safe to call re-entrantly either (TOSIOS's own game
+   * loop assumes at most one in-flight call). Skipping (not queueing) an
+   * overlapping tick is the correct backpressure response — Colyseus's own
+   * simulation cadence degrades gracefully under real load instead of
+   * accumulating unbounded work.
+   */
+  private tickInFlight = false;
 
   // handleTick is an ARROW-FUNCTION INSTANCE FIELD on GameRoom (`handleTick
   // = () => { this.state.update(); }`), not a prototype method — `super.
@@ -106,21 +134,27 @@ export class AdaptedGameRoom extends GameRoom {
   // WITHIN one call, `beforeTick` fully completes before `state.update()`
   // starts, which is the actual ordering guarantee that matters.
   handleTick = async (): Promise<void> => {
-    if (this.hooks.beforeTick) {
-      try {
-        await this.hooks.beforeTick(this.state, Date.now());
-      } catch (err) {
-        // A failing AI decision must never take down the real, live match
-        // for every other (possibly human) player in the room — TOSIOS's
-        // own simulation proceeds exactly as if the AI had done nothing
-        // this tick, same as a human whose input silently dropped.
-        // eslint-disable-next-line no-console
-        console.error('[AdaptedGameRoom] beforeTick hook failed — continuing without it this tick', err);
+    if (this.tickInFlight) return; // previous tick still running (real AI/DB latency) — skip this interval tick rather than queue an unbounded backlog, see tickInFlight's doc comment
+    this.tickInFlight = true;
+    try {
+      if (this.hooks.beforeTick) {
+        try {
+          await this.hooks.beforeTick(this.state, Date.now());
+        } catch (err) {
+          // A failing AI decision must never take down the real, live match
+          // for every other (possibly human) player in the room — TOSIOS's
+          // own simulation proceeds exactly as if the AI had done nothing
+          // this tick, same as a human whose input silently dropped.
+          // eslint-disable-next-line no-console
+          console.error('[AdaptedGameRoom] beforeTick hook failed — continuing without it this tick', err);
+        }
       }
+      this.state.update(); // exact original body of GameRoom's own handleTick
+      const events = this.deriver.diffTick(captureSnapshot(this.state, Date.now()));
+      if (events.length > 0) this.hooks.onEvents(events);
+    } finally {
+      this.tickInFlight = false;
     }
-    this.state.update(); // exact original body of GameRoom's own handleTick
-    const events = this.deriver.diffTick(captureSnapshot(this.state, Date.now()));
-    if (events.length > 0) this.hooks.onEvents(events);
   };
 
   // handleMessage is likewise an arrow-function instance field
