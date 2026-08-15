@@ -1,5 +1,5 @@
 import { Db, Collection } from 'mongodb';
-import { applyObservation, UNOBSERVED_DIMENSION } from './confidence';
+import { applyObservation, decayConfidence, UNOBSERVED_DIMENSION } from './confidence';
 import { ConfidenceConfig } from './config';
 import { SemanticVersionNotFoundError, SemanticWriteConflictError } from './errors';
 import { GameScope, SemanticDimensionState, SemanticDimensionVersion, UpdateSemanticMemoryInput } from './types';
@@ -177,6 +177,40 @@ export class SemanticMemoryStore {
       }
     }
     throw new SemanticWriteConflictError(playerId, gameId, dimension, this.maxRetries);
+  }
+
+  /**
+   * Daily-maintenance-cadence sweep (whitepaper §10): decays confidence for
+   * every dimension proportional to days since it was last updated — "this
+   * read might be stale," never touching `samples` (see `decayConfidence`'s
+   * doc comment). Not called on every match — a separate scheduled
+   * operation, exactly like Pattern Recognition's `decayDormantPatterns`.
+   *
+   * Unlike patterns, semantic dimensions carry no per-record decay rate or
+   * lifecycle state — decay rate comes from the single injected
+   * `confidenceConfig.decayRatePerDay`, and there's no state machine to
+   * re-evaluate, only the confidence value itself. A dimension whose write
+   * races this sweep (`RaceLostError`) is skipped rather than retried — a
+   * best-effort maintenance pass, not a caller-facing write; the next daily
+   * sweep will catch it.
+   */
+  async decayDormantDimensions(now: number = Date.now()): Promise<number> {
+    const all = await this.latest.find({}).toArray();
+    let decayed = 0;
+    for (const doc of all) {
+      const daysSince = (now - doc.updatedAt) / (24 * 60 * 60 * 1000);
+      if (daysSince <= 0) continue;
+      const confidence = decayConfidence(doc.confidence, daysSince, this.confidenceConfig.decayRatePerDay);
+      if (confidence === doc.confidence) continue;
+      try {
+        await this.writeNewVersionAtBase(doc.playerId, doc.gameId, doc.dimension, doc.version, { value: doc.value, confidence, samples: doc.samples }, { reason: 'dormant-decay' });
+        decayed += 1;
+      } catch (err) {
+        if (err instanceof RaceLostError) continue;
+        throw err;
+      }
+    }
+    return decayed;
   }
 }
 

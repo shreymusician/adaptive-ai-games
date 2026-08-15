@@ -197,3 +197,71 @@ describe('SemanticMemoryStore concurrent updates', () => {
     expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(SemanticWriteConflictError);
   });
 });
+
+describe('SemanticMemoryStore.decayDormantDimensions', () => {
+  const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+
+  it('decays a dormant dimension\'s confidence, as a new version, samples untouched', async () => {
+    const { store } = makeStore();
+    await store.ensureIndexes();
+    const before = await store.update({ playerId: 'p1', gameId: 'g1', dimension: 'aggression', observation: 0.9 });
+
+    const decayedCount = await store.decayDormantDimensions(before.updatedAt + oneYearMs);
+
+    const after = await store.getCurrent('p1', 'g1', 'aggression');
+    expect(decayedCount).toBe(1);
+    expect(after!.confidence).toBeLessThan(before.confidence);
+    expect(after!.samples).toBe(before.samples); // decay reflects staleness, not forgotten evidence
+    expect(after!.version).toBe(before.version + 1); // a new version, never a mutation
+  });
+
+  it('never decays a dimension updated very recently (sweep run with the same "now" as the write)', async () => {
+    const { store } = makeStore();
+    await store.ensureIndexes();
+    const before = await store.update({ playerId: 'p1', gameId: 'g1', dimension: 'aggression', observation: 0.9 });
+
+    const decayedCount = await store.decayDormantDimensions(before.updatedAt);
+
+    const after = await store.getCurrent('p1', 'g1', 'aggression');
+    expect(decayedCount).toBe(0);
+    expect(after!.confidence).toBe(before.confidence);
+    expect(after!.version).toBe(before.version);
+  });
+
+  it('confidence never goes negative or leaves [0, 1] even after a very long dormancy', async () => {
+    const { store } = makeStore();
+    await store.ensureIndexes();
+    const before = await store.update({ playerId: 'p1', gameId: 'g1', dimension: 'aggression', observation: 0.9, k: 1 }); // small k -> high starting confidence
+
+    await store.decayDormantDimensions(before.updatedAt + 100 * oneYearMs);
+
+    const after = await store.getCurrent('p1', 'g1', 'aggression');
+    expect(after!.confidence).toBeGreaterThanOrEqual(0);
+    expect(after!.confidence).toBeLessThanOrEqual(1);
+  });
+
+  it('decayRatePerDay = 0 disables decay entirely', async () => {
+    const db = new FakeDb();
+    const config = loadMemoryEngineConfig({ confidence: { defaultK: 10, dimensionK: {}, alphaMin: 0.02, decayRatePerDay: 0 } });
+    const store = new SemanticMemoryStore(db as unknown as Db, config.confidence, 5);
+    await store.ensureIndexes();
+    const before = await store.update({ playerId: 'p1', gameId: 'g1', dimension: 'aggression', observation: 0.9 });
+
+    const decayedCount = await store.decayDormantDimensions(before.updatedAt + oneYearMs);
+
+    const after = await store.getCurrent('p1', 'g1', 'aggression');
+    expect(decayedCount).toBe(0);
+    expect(after!.confidence).toBe(before.confidence);
+  });
+
+  it('sweeps every dimension independently, across players/games', async () => {
+    const { store } = makeStore();
+    await store.ensureIndexes();
+    const a = await store.update({ playerId: 'p1', gameId: 'g1', dimension: 'aggression', observation: 0.9 });
+    const b = await store.update({ playerId: 'p2', gameId: 'g1', dimension: 'riskTolerance', observation: 0.4 });
+
+    const decayedCount = await store.decayDormantDimensions(Math.max(a.updatedAt, b.updatedAt) + oneYearMs);
+
+    expect(decayedCount).toBe(2);
+  });
+});
